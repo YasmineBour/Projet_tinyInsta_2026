@@ -14,7 +14,27 @@ gcloud config set project $P
 
 La variable `P` est utilisée dans toutes les commandes suivantes. Si vous ouvrez un nouvel onglet Cloud Shell, redéfinissez-la.
 
-## 2. Peupler le store
+## 2. Créer l'application App Engine et l'index
+
+À faire une seule fois par projet :
+
+```sh
+gcloud app create --region=europe-west                 # la région ne pourra plus être changée ensuite
+gcloud app deploy app.yaml                             # version par défaut de l'application
+gcloud datastore indexes create index.yaml --quiet     # index composite Post(author, created desc)
+gcloud datastore indexes list                          # attendez que l'index soit READY (quelques minutes)
+```
+
+Vérifiez que l'application répond, avec l'index en place :
+
+```sh
+APP=$(gcloud app browse --no-launch-browser)
+curl -s "$APP/api/timeline?user=test"                 # doit renvoyer du JSON ({"count":0,...}), pas une erreur 500
+```
+
+Tant que l'index n'est pas prêt, les timelines échouent (erreur 500).
+
+## 3. Peupler le store
 
 Un jeu de données est identifié par un **préfixe**. Il contient `U` utilisateurs (`<préfixe>_u00000` … `<préfixe>_u<U-1>`). Chacun a **exactement** `P` posts et suit **exactement** `F` autres utilisateurs du même jeu.
 
@@ -43,7 +63,7 @@ Options utiles :
 
 **Ne relancez pas un préfixe déjà généré** : les nouveaux posts s'ajouteraient aux anciens. Purgez-le d'abord.
 
-## 3. Déployer une version à instances fixes
+## 4. Déployer une version à instances fixes
 
 ```sh
 ./deploy_fixed.sh 1                       # version fixed1 : exactement 1 instance, sans autoscaling
@@ -64,7 +84,7 @@ gcloud app versions stop fixed1
 gcloud app versions start fixed1
 ```
 
-## 4. Lancer une mesure avec Locust
+## 5. Lancer une mesure avec Locust
 
 Une commande correspond à un run : `C` utilisateurs Locust simultanés, pendant une durée fixe. Chaque utilisateur Locust interroge en boucle la timeline d'un utilisateur TinyInsta qui lui est propre : il envoie une nouvelle requête dès qu'il reçoit la réponse précédente.
 
@@ -97,7 +117,7 @@ Le fichier `TINY_LOG` contient **une ligne par requête** :
 
 C'est à vous de calculer, à partir de ces fichiers, les indicateurs demandés par le sujet : médianes, débit, nombre d'instances actives, échecs…
 
-## 5. Dépannage
+## 6. Dépannage
 
 - **Erreur d'authentification avec `seed_exact.py`** : lancez `gcloud auth application-default login`, puis recommencez.
 - **Commande `locust` introuvable** : utilisez `python -m locust` à la place de `locust`.
