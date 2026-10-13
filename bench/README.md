@@ -16,7 +16,15 @@ La variable `P` est utilisée dans toutes les commandes suivantes. Si vous ouvre
 
 ## 2. Créer l'application App Engine et l'index
 
-À faire une seule fois par projet :
+À faire une seule fois par projet. Commencez par associer un compte de facturation au projet : sans lui, `gcloud app deploy` échoue (*The project must have a billing account attached*). Utilisez le compte de vos crédits éducation, qui apparaît une fois le coupon utilisé.
+
+```sh
+gcloud billing accounts list                                   # repérez un compte ouvert (OPEN = True)
+gcloud billing projects link $P --billing-account=<ID_DU_COMPTE>
+gcloud billing projects describe $P --format='value(billingEnabled)'   # doit afficher True
+```
+
+Créez ensuite l'application, déployez-la et créez l'index :
 
 ```sh
 gcloud app create --region=europe-west                 # la région ne pourra plus être changée ensuite
