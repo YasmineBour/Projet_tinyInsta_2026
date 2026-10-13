@@ -128,6 +128,7 @@ C'est à vous de calculer, à partir de ces fichiers, les indicateurs demandés 
 ## 6. Dépannage
 
 - **Erreur d'authentification avec `seed_exact.py`** : lancez `gcloud auth application-default login`, puis recommencez.
+- **Datastore Studio n'affiche pas vos entités** : juste après un seed, la liste des types (*kinds*) de la console peut ne pas encore contenir `User` ni `Post`, alors que les données sont bien là. Lancez une requête GQL dans le Studio (`SELECT * FROM User`) au lieu de passer par la liste. **Ne relancez pas le seed** pour autant : les posts s'ajouteraient aux anciens.
 - **Commande `locust` introuvable** : utilisez `python -m locust` à la place de `locust`.
 - **Pas d'en-tête `X-Instance` dans la réponse** : vous interrogez sans doute une version qui n'existe pas. App Engine renvoie alors silencieusement la version par défaut. Vérifiez le nom de la version et `$URL`.
 - **Longues séries de mesures** : Cloud Shell coupe une session inactive au bout d'environ une heure, et ce qui tourne dans le terminal s'arrête avec elle. Lancez vos séries dans `tmux`, gardez l'onglet ouvert, et découpez-les pour pouvoir reprendre. Vos fichiers dans `$HOME` sont conservés.
