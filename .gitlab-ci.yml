@@ -1,0 +1,11 @@
+# GitLab Pages : publie le dossier public/ (déjà construit, rien à installer sur le runner).
+# Régénérez-le en local avec ./make-site.sh avant de committer.
+pages:
+  stage: deploy
+  script:
+    - echo "Publishing public/"
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

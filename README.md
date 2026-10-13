@@ -2,6 +2,8 @@
 
 This repository contains a tiny Instagram-like demo implemented with Flask and Google Cloud Datastore (Firestore in Datastore mode). It is a small, educational project that demonstrates posting, following, and reading a simple timeline.
 
+**Project subject (2026): see [SUJET.md](SUJET.md).**
+
 This README describes how to run, seed and test the app, plus notes about GQL queries and common deployment troubleshooting.
 
 ## Prerequisites

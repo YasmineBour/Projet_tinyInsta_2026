@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="fr" xml:lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.12.1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Projet Données massives et Cloud — TinyInsta 2026</title>
+  <style>
+
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+
+ul.task-list[class]{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+font-size: inherit;
+width: 0.8em;
+margin: 0 0.8em 0.2em -1.6em;
+vertical-align: middle;
+}
+</style>
+  <style type="text/css">:root { --fg: #1a1a1a; --bg: #ffffff; --muted: #555; --accent: #1f3864; --link: #1a4f9c;
+--code-bg: #f2f2f2; --border: #c8c8c8; --th: #e8edf5; --quote-bg: #eaf1fb; --quote-bar: #2f5597; }
+@media (prefers-color-scheme: dark) {
+:root { --fg: #e6e6e6; --bg: #16181d; --muted: #aaa; --accent: #9bb7e8; --link: #8fb4ff;
+--code-bg: #262a33; --border: #3a3f4b; --th: #232836; --quote-bg: #1d2636; --quote-bar: #6d93d6; }
+}
+html { font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 16px;
+line-height: 1.55; color: var(--fg); background: var(--bg); }
+body { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; background: var(--bg); overflow-wrap: break-word; }
+h1 { font-size: 1.9rem; color: var(--accent); margin: 0.2em 0 0.3em; }
+h2 { font-size: 1.35rem; color: var(--accent); margin: 1.8em 0 0.5em; padding-bottom: 0.2em; border-bottom: 1px solid var(--border); }
+h3 { font-size: 1.1rem; margin: 1.4em 0 0.4em; }
+a { color: var(--link); overflow-wrap: anywhere; }
+code { font-family: Menlo, Consolas, "SF Mono", monospace; font-size: 0.88em; background: var(--code-bg);
+padding: 0.1em 0.3em; border-radius: 3px; overflow-wrap: anywhere; }
+pre { background: var(--code-bg); padding: 10px 12px; border-radius: 4px; overflow-x: auto; }
+pre code { background: none; padding: 0; }
+blockquote { margin: 1em 0; padding: 0.6em 1em; background: var(--quote-bg); border-left: 4px solid var(--quote-bar); }
+blockquote p { margin: 0; }
+table { border-collapse: collapse; width: 100%; margin: 0.8em 0 1.2em; font-size: 0.92rem; display: block; overflow-x: auto; }
+th, td { border: 1px solid var(--border); padding: 6px 8px; text-align: left; vertical-align: top; }
+th { background: var(--th); }
+li { margin: 0.25em 0; }
+</style>
+</head>
+<body>
+<h1 id="projet-données-massives-et-cloud">PROJET DONNÉES MASSIVES ET
+CLOUD</h1>
+<p><strong>TinyInsta passe-t-elle à l’échelle ? — Benchmark, édition
+2026</strong></p>
+<p>Dernière mise à jour : 13/10/2026 · Rendu <strong>individuel</strong>
+· Date limite : <strong>[à compléter]</strong></p>
+<h2 id="1-objectif">1. Objectif</h2>
+<p>TinyInsta (<a href="https://gitlab.univ-nantes.fr/molli-p/tinyinsta-2026">https://gitlab.univ-nantes.fr/molli-p/tinyinsta-2026</a>)
+est un réseau social minimaliste déployé sur Google App Engine (PaaS),
+avec Google Cloud Datastore (Firestore en mode Datastore) pour le
+stockage. Un utilisateur poste des messages et suit d’autres
+utilisateurs. Sa <em>timeline</em> est la liste des 20 messages les plus
+récents des comptes qu’il suit et des siens
+(<code>GET /api/timeline?user=…</code>).</p>
+<blockquote>
+<p><strong>Question du projet : TinyInsta passe-t-elle à l’échelle ? Si
+la réponse est nuancée : qu’est-ce qui passe à l’échelle, jusqu’où, et
+pourquoi ?</strong></p>
+</blockquote>
+<p>Vous devez répondre à cette question par des expériences rigoureuses
+et reproductibles, puis expliquer chaque résultat par le code de
+l’application ou par le fonctionnement de la plateforme. Ce qui est
+évalué n’est pas d’obtenir « les bons chiffres », mais de
+<strong>démontrer</strong> vos conclusions.</p>
+<p>Dans ce projet, « passer à l’échelle » a deux sens précis :</p>
+<ul>
+<li><strong>Données</strong> : quand un paramètre des données est
+multiplié par 10, le temps de traitement d’une requête reste à peu près
+constant.</li>
+<li><strong>Ressources</strong> : quand le nombre d’instances est
+multiplié par k, le débit maximal (requêtes servies par seconde) est
+multiplié par environ k.</li>
+</ul>
+<p>Les données sont décrites par trois paramètres :</p>
+<table>
+<thead>
+<tr>
+<th>Paramètre</th>
+<th>Signification</th>
+<th>Valeur de référence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>U</strong></td>
+<td>Nombre d’utilisateurs du jeu de données</td>
+<td>1000</td>
+</tr>
+<tr>
+<td><strong>P</strong></td>
+<td>Nombre <strong>exact</strong> de posts de chaque utilisateur</td>
+<td>20</td>
+</tr>
+<tr>
+<td><strong>F</strong></td>
+<td>Nombre <strong>exact</strong> de comptes suivis (<em>followees</em>)
+par chaque utilisateur</td>
+<td>20</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-mise-en-place">2. Mise en place</h2>
+<ol type="1">
+<li>Utilisez votre projet GCP personnel et Cloud Shell. <strong>Créez
+une alerte budgétaire à 20 $</strong> (Facturation › Budgets et
+alertes).</li>
+<li>Clonez le dépôt et installez les outils de mesure :
+<code>pip install -r bench/requirements.txt</code>.</li>
+<li>Déployez l’application en suivant le README du dépôt. Vérifiez
+qu’une timeline répond avant d’aller plus loin.</li>
+<li>Générez les jeux de données ci-dessous avec
+<code>bench/seed_exact.py</code> (exemple :
+<code>python bench/seed_exact.py --prefix base --users 1000 --posts-per-user 20 --followees 20</code>).
+Chaque jeu a son propre préfixe ; relancer un préfixe <em>ajoute</em>
+des posts, donc purgez-le d’abord (<code>--purge</code>).</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>Jeu (préfixe)</th>
+<th>U</th>
+<th>P</th>
+<th>F</th>
+<th>Utilisé dans</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>base</code></td>
+<td>1000</td>
+<td>20</td>
+<td>20</td>
+<td>Parties 1 (référence), 2, 3</td>
+</tr>
+<tr>
+<td><code>u100</code>, <code>u10000</code></td>
+<td>100 / 10 000</td>
+<td>20</td>
+<td>20</td>
+<td>Partie 1, facteur U</td>
+</tr>
+<tr>
+<td><code>p10</code>, <code>p100</code>, <code>p1000</code></td>
+<td>100</td>
+<td>10 / 100 / 1000</td>
+<td>20</td>
+<td>Partie 1, facteur P</td>
+</tr>
+<tr>
+<td><code>f05</code>, <code>f10</code>, …, <code>f100</code></td>
+<td>120</td>
+<td>20</td>
+<td>5, 10, 15, …, 100 (20 jeux)</td>
+<td>Partie 1, facteur F</td>
+</tr>
+</tbody>
+</table>
+<p>Au total, environ 400 000 entités : quelques minutes depuis Cloud
+Shell, pour moins de 1 $.</p>
+<h2 id="3-outils-fournis">3. Outils fournis</h2>
+<p>Le dépôt fournit les outils suivants ; leur usage détaillé est dans
+le README.</p>
+<table>
+<thead>
+<tr>
+<th>Outil</th>
+<th>Rôle</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>En-têtes de <code>/api/timeline</code></td>
+<td><code>X-Instance</code> : instance App Engine qui a servi la
+requête. <code>Server-Timing: timeline;dur=…</code> : temps passé côté
+serveur (ms).</td>
+</tr>
+<tr>
+<td><code>app.yaml</code></td>
+<td>Déploiement par défaut de l’application (autoscaling, au plus 10
+instances).</td>
+</tr>
+<tr>
+<td><code>./deploy_fixed.sh N</code></td>
+<td>Déploie la version <code>fixedN</code> avec exactement N instances,
+sans autoscaling (parties 1 et 2). <strong>Facturée tant qu’elle
+tourne</strong> : <code>gcloud app versions stop fixedN</code> après
+usage.</td>
+</tr>
+<tr>
+<td><code>bench/seed_exact.py</code></td>
+<td>Génère ou purge un jeu de données exact (U, P, F).</td>
+</tr>
+<tr>
+<td><code>bench/locustfile.py</code></td>
+<td>Charge constante avec Locust, en boucle fermée, un utilisateur
+TinyInsta distinct par utilisateur Locust. Écrit une ligne par
+requête.</td>
+</tr>
+</tbody>
+</table>
+<p>N’utilisez pas <code>ab</code> (apache-bench) : il interroge une
+seule URL, donc un seul utilisateur, et ne compte pas les réponses HTTP
+5xx comme des échecs.</p>
+<h2 id="4-charte-expérimentale-obligatoire">4. Charte expérimentale
+(obligatoire)</h2>
+<p>Toutes vos mesures doivent respecter les règles suivantes.</p>
+<ol type="1">
+<li><strong>Énoncer une hypothèse pour chaque expérience.</strong> Dans
+le rapport, chaque partie commence par l’hypothèse testée et le
+mécanisme attendu, argumentés à partir du code (<code>main.py</code>) et
+du fonctionnement de la plateforme. Les résultats sont ensuite
+confrontés à cette hypothèse. Une hypothèse réfutée et bien expliquée
+vaut autant qu’une hypothèse confirmée.</li>
+<li><strong>Un seul facteur varie à la fois.</strong> Chaque figure
+indique les valeurs de tous les paramètres fixés.</li>
+<li><strong>Mesurer l’état de la plateforme, ne pas le
+supposer.</strong> Pour chaque mesure, rapportez le nombre d’instances
+qui ont <strong>réellement servi</strong> des requêtes (en-tête
+<code>X-Instance</code>), et non le nombre d’instances listées par
+<code>gcloud</code>.</li>
+<li><strong>Tout est reproductible.</strong> Les journaux bruts sont
+dans le dépôt, et une seule commande régénère toutes les figures à
+partir des données.</li>
+</ol>
+<h2 id="5-partie-1--coût-dune-requête">5. Partie 1 — Coût d’une
+requête</h2>
+<blockquote>
+<p><strong>Question : de quoi dépend le temps de traitement d’une
+timeline ?</strong></p>
+</blockquote>
+<p><strong>Hypothèse.</strong> Pour chacun des facteurs U, P et F,
+indiquez comment le temps serveur d’une timeline devrait évoluer, et
+pourquoi (lisez <code>get_timeline</code> dans
+<code>main.py</code>).</p>
+<p><strong>Protocole imposé.</strong></p>
+<ul>
+<li>Version <code>fixed1</code> (1 instance fixe), <strong>1 requête à
+la fois</strong> (<code>-u 1</code>). Cette configuration élimine
+l’effet de l’autoscaling et de la concurrence.</li>
+<li>Facteur U ∈ {100, 1000, 10 000} ; facteur P ∈ {10, 100, 1000} ;
+facteur F ∈ {5, 10, 15, …, 100} (20 valeurs). Les autres paramètres
+restent à leur valeur de référence (jeux de la section 2).</li>
+<li>Mesurez la latence côté client <strong>et</strong> le temps côté
+serveur (<code>Server-Timing</code>).</li>
+</ul>
+<p><strong>Figures.</strong> <em>Fig. 1a</em> : temps serveur médian en
+fonction de U et de P. <em>Fig. 1b</em> : temps serveur médian et
+latence client médiane en fonction de F (20 valeurs).</p>
+<p><strong>Questions.</strong></p>
+<ul>
+<li>Vos hypothèses sont-elles confirmées ? Sinon, qu’aviez-vous manqué
+?</li>
+<li>Quelle part de la latence client est due au réseau ?</li>
+<li>Combien d’entités Datastore une timeline lit-elle, selon U, P et F ?
+Déduisez-en le coût de 1 million de timelines dans chaque cas (grille
+tarifaire de Datastore).</li>
+</ul>
+<h2 id="6-partie-2--capacité">6. Partie 2 — Capacité</h2>
+<blockquote>
+<p><strong>Question : combien de timelines par seconde une instance
+peut-elle servir ? Le débit maximal est-il proportionnel au nombre
+d’instances ?</strong></p>
+</blockquote>
+<p><strong>Protocole imposé.</strong></p>
+<ul>
+<li>Versions <code>fixed1</code>, <code>fixed2</code> et
+<code>fixed4</code> (N = 1, 2, 4 instances fixes), jeu
+<code>base</code>.</li>
+<li>Concurrence C ∈ {1, 2, 4, 8, 16, 32, 64} (nombre d’utilisateurs
+Locust simultanés).</li>
+<li>Pour limiter le coût, déployez une version à la fois, faites toutes
+ses mesures, puis arrêtez-la avant de passer à la suivante.</li>
+<li>Vérifiez pour chaque mesure que le nombre d’instances actives vaut
+bien N.</li>
+<li>On suppose que le client de charge (Locust) n’est pas un
+goulot.</li>
+</ul>
+<p><strong>Figures.</strong> <em>Fig. 2a</em> : débit en fonction de C,
+une courbe par valeur de N. <em>Fig. 2b</em> : latence médiane en
+fonction de C, avec la prédiction de la loi de Little (latence ≈ C /
+débit).</p>
+<p><strong>Questions.</strong></p>
+<ul>
+<li>Où se situe le point de saturation pour chaque N ? Quelle est la
+capacité d’une instance, et qu’est-ce qui la limite ? (Indice : comment
+l’application est-elle lancée ?)</li>
+<li>La loi de Little est-elle vérifiée au-delà de la saturation ?</li>
+<li>Passer de 1 à 4 instances multiplie-t-il le débit maximal par 4 ?
+Sinon, où est le goulot ?</li>
+</ul>
+<h2 id="7-partie-3--corriger-et-re-mesurer">7. Partie 3 — Corriger et
+re-mesurer</h2>
+<p>Choisissez un des goulots identifiés dans les parties 1 et 2.
+Proposez une modification du code ou de la configuration qui le lève,
+déployez-la dans une version à part (<code>--no-promote</code>), puis
+ré-exécutez <strong>exactement le même protocole</strong> que la mesure
+d’origine.</p>
+<p><strong>Figure.</strong> <em>Fig. 3</em> : avant et après, sur la
+même figure. Expliquez le gain obtenu, ou son absence, et ce que la
+correction coûte (complexité, argent, cohérence des données).</p>
+<h2 id="8-rendu">8. Rendu</h2>
+<p>Vous déposez sur Madoc deux URL : celle de votre dépôt GitHub ou
+GitLab, et celle de votre application déployée (version par défaut, qui
+doit rester fonctionnelle jusqu’à la fin de la correction). Le dépôt
+contient :</p>
+<ul>
+<li><code>README.md</code> : votre rapport, avec les sections imposées
+ci-dessous ;</li>
+<li>pour chaque figure, le fichier CSV des valeurs tracées
+(<code>figures/fig1a.csv</code>, …), avec un en-tête explicite et les
+unités dans les noms de colonnes ;</li>
+<li>le dossier <code>raw/</code> avec tous les journaux bruts produits
+par <code>bench/locustfile.py</code> (compressés si nécessaire) ;</li>
+<li><code>figures/fig1a.png</code> … <code>figures/fig3.png</code>,
+affichées dans le README ;</li>
+<li>vos scripts : orchestration des mesures (Snakemake conseillé) et
+génération des figures en une commande.</li>
+</ul>
+<p><strong>Sections imposées du README</strong> : 1. Montage (projet,
+région, versions, dates, d’où tourne le client) ; 2. Résultats des
+parties 1 à 3 (pour chacune : hypothèse, figures, interprétation) ; 3.
+Tableau des verdicts ; 4. Validité ; 5. Coût de la campagne.</p>
+<p><strong>Tableau des verdicts</strong> (à remplir dans le README)
+:</p>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Passe à l’échelle ?</th>
+<th>Jusqu’où ?</th>
+<th>Pourquoi (mécanisme)</th>
+<th>Preuve</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Utilisateurs (U)</td>
+<td></td>
+<td></td>
+<td></td>
+<td>Fig. …</td>
+</tr>
+<tr>
+<td>Posts par utilisateur (P)</td>
+<td></td>
+<td></td>
+<td></td>
+<td>Fig. …</td>
+</tr>
+<tr>
+<td>Followees (F)</td>
+<td></td>
+<td></td>
+<td></td>
+<td>Fig. …</td>
+</tr>
+<tr>
+<td>Instances (N)</td>
+<td></td>
+<td></td>
+<td></td>
+<td>Fig. …</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Questions de validité</strong> (une réponse argumentée pour
+chacune, dans la section 4 du README) :</p>
+<ol type="1">
+<li>Combien d’instances ont réellement servi chacune de vos mesures ?
+Est-ce celles que vous attendiez ?</li>
+<li>Vos runs sont-ils indépendants ? L’ordre dans lequel vous avez
+enchaîné les mesures influence-t-il les résultats ?</li>
+<li>Quelle part de la latence est due au réseau ?</li>
+<li>Qu’avez-vous compté comme un échec ? Quels codes HTTP avez-vous
+observés ?</li>
+<li>Avez-vous vérifié que votre mesure exerce bien le chemin de code que
+vous croyez ?</li>
+<li>Combien votre campagne a-t-elle coûté (lectures, écritures, heures
+d’instance) ?</li>
+</ol>
+<h2 id="9-budget-et-garde-fous">9. Budget et garde-fous</h2>
+<ul>
+<li><strong>Arrêtez chaque version</strong> <code>fixedN</code>
+<strong>dès la fin de ses mesures</strong>
+(<code>gcloud app versions stop fixedN</code>) : en manual scaling, une
+instance est facturée en continu.</li>
+<li>Ne dépassez pas 64 utilisateurs simultanés ni 4 instances
+fixes.</li>
+<li>Les timelines à F élevé lisent beaucoup d’entités : ne relancez pas
+ces mesures sans raison.</li>
+<li>Estimation, d’après un run pilote : moins de 1 $ pour les données et
+2 à 5 $ pour l’ensemble des mesures. Surveillez la page
+Facturation.</li>
+<li>À la fin du projet, supprimez les versions inutiles et purgez les
+jeux de données.</li>
+</ul>
+<p>Bon courage !</p>
+</body>
+</html>
