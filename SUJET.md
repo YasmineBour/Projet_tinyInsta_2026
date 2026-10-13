@@ -2,7 +2,7 @@
 
 **TinyInsta passe-t-elle à l’échelle ? — Benchmark, édition 2026**
 
-Dernière mise à jour : 13/10/2026 · Rendu **individuel** · Date limite : **[à compléter]**
+Dernière mise à jour : 13/10/2026 · Rendu **individuel** · Date limite : **27 novembre 2026**
 
 ## 1. Objectif
 
