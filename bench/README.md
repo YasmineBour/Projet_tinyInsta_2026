@@ -154,6 +154,7 @@ gcloud firestore operations list --project=$P                     # suivre l'ava
 - `--collection-ids` liste les types (*kinds*) à supprimer : toutes leurs entités disparaissent, quel que soit le préfixe.
 - La suppression s'exécute **côté Google, en arrière-plan** : elle continue même si vous fermez Cloud Shell. La commande affiche un nom d'opération, qui permet de suivre l'avancement ou d'annuler (`gcloud firestore operations cancel`).
 - La base, son index et l'application restent en place : on peut relancer `seed_exact.py` dès que l'opération est terminée.
+- **Comptez plusieurs minutes**, même pour un petit jeu (environ 4 minutes pour 21 000 entités lors d'un essai). Si `gcloud` rend la main en affichant encore `operationState: PROCESSING`, attendez que `gcloud firestore operations list` indique `SUCCESSFUL` avant de regénérer les données.
 
 ### Détruire et recréer la base
 
@@ -172,6 +173,7 @@ gcloud datastore indexes create index.yaml --quiet --project=$P
 gcloud datastore indexes list --project=$P                                         # attendez READY
 ```
 
+- **Si vous recréez trop tôt**, la création échoue avec *Database ID '(default)' is not available in project … Please retry*. Attendez encore un peu : lors d'un essai, la création a réussi 5 min 23 s après la suppression.
 - **N'oubliez pas `--type=datastore-mode`.** Sans cette option, la base est créée en mode *Firestore natif*, et l'application ne fonctionne plus.
 - **Reprenez le même emplacement** qu'avant (`locationId`). L'emplacement d'une base ne peut plus être modifié ensuite.
 - **Entre la suppression et la recréation, l'application est en panne** : les timelines renvoient des erreurs 500.
