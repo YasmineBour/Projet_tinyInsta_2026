@@ -125,7 +125,59 @@ Le fichier `TINY_LOG` contient **une ligne par requête** :
 
 C'est à vous de calculer, à partir de ces fichiers, les indicateurs demandés par le sujet : médianes, débit, nombre d'instances actives, échecs…
 
-## 6. Dépannage
+## 6. Repartir de zéro
+
+Trois façons de supprimer des données, de la plus ciblée à la plus radicale :
+
+| Besoin | Moyen | Ce qui reste |
+|---|---|---|
+| Supprimer **un jeu de données** | `seed_exact.py --purge` | Les autres jeux, la base, l'index |
+| Vider **toute la base** | `gcloud firestore bulk-delete` | La base et l'index |
+| **Détruire et recréer** la base | `gcloud firestore databases delete`, puis `create` | Rien : base neuve, index à recréer |
+
+### Supprimer un jeu de données
+
+```sh
+python bench/seed_exact.py --project $P --prefix base --purge
+```
+
+Seuls les utilisateurs `base_u…` et leurs posts sont supprimés.
+
+### Vider toute la base
+
+```sh
+gcloud services enable firestore.googleapis.com --project=$P     # une seule fois, si l'API n'est pas encore activée
+gcloud firestore bulk-delete --collection-ids=Post,User --project=$P
+gcloud firestore operations list --project=$P                     # suivre l'avancement
+```
+
+- `--collection-ids` liste les types (*kinds*) à supprimer : toutes leurs entités disparaissent, quel que soit le préfixe.
+- La suppression s'exécute **côté Google, en arrière-plan** : elle continue même si vous fermez Cloud Shell. La commande affiche un nom d'opération, qui permet de suivre l'avancement ou d'annuler (`gcloud firestore operations cancel`).
+- La base, son index et l'application restent en place : on peut relancer `seed_exact.py` dès que l'opération est terminée.
+
+### Détruire et recréer la base
+
+À réserver au cas où la base elle-même pose problème : mauvais type, mauvais emplacement, état inconnu.
+
+```sh
+gcloud services enable firestore.googleapis.com --project=$P
+gcloud firestore databases describe --database='(default)' --project=$P          # notez locationId (par exemple eur3)
+gcloud firestore databases update --database='(default)' --no-delete-protection --project=$P   # si la protection est active
+gcloud firestore databases delete --database='(default)' --project=$P
+
+# attendez au moins 5 minutes : l'identifiant (default) ne peut pas être réutilisé avant
+gcloud firestore databases create --database='(default)' --location=<locationId noté plus haut> \
+    --type=datastore-mode --project=$P
+gcloud datastore indexes create index.yaml --quiet --project=$P
+gcloud datastore indexes list --project=$P                                         # attendez READY
+```
+
+- **N'oubliez pas `--type=datastore-mode`.** Sans cette option, la base est créée en mode *Firestore natif*, et l'application ne fonctionne plus.
+- **Reprenez le même emplacement** qu'avant (`locationId`). L'emplacement d'une base ne peut plus être modifié ensuite.
+- **Entre la suppression et la recréation, l'application est en panne** : les timelines renvoient des erreurs 500.
+- La base recréée n'est plus « liée » à App Engine. Ce n'est pas gênant : TinyInsta y accède par la bibliothèque `google-cloud-datastore`.
+
+## 7. Dépannage
 
 - **Erreur d'authentification avec `seed_exact.py`** : lancez `gcloud auth application-default login`, puis recommencez.
 - **Datastore Studio n'affiche pas vos entités** : juste après un seed, la liste des types (*kinds*) de la console peut ne pas encore contenir `User` ni `Post`, alors que les données sont bien là. Lancez une requête GQL dans le Studio (`SELECT * FROM User`) au lieu de passer par la liste. **Ne relancez pas le seed** pour autant : les posts s'ajouteraient aux anciens.
