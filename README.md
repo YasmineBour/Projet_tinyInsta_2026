@@ -20,7 +20,7 @@ gcloud app create
 
 - clone the course repository : 
 ```
-git clone <GITLAB_URL>
+git clone https://gitlab.univ-nantes.fr/molli-p/tinyinsta-2026.git
 cd tinyinsta-2026
 ```
 
