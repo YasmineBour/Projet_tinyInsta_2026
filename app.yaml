@@ -1,0 +1,14 @@
+runtime: python312
+entrypoint: gunicorn -b :$PORT main:app
+
+instance_class: F1
+
+# Autoscaling plafonné pour maîtriser le budget.
+automatic_scaling:
+  max_instances: 10
+
+handlers:
+- url: /
+  script: auto
+env_variables:
+  SEED_TOKEN: "change-me-seed-token"

@@ -1,0 +1,2 @@
+locust>=2.20
+google-cloud-datastore==2.19.0
