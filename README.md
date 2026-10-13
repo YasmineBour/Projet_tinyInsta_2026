@@ -78,6 +78,8 @@ curl -X POST \
 
 ## Benchmark toolkit (project)
 
+Step-by-step instructions for Cloud Shell (in French): [bench/README.md](bench/README.md).
+
 The project uses the tools below (`bench/` is not uploaded to App Engine). Install them in Cloud Shell:
 
 ```sh
