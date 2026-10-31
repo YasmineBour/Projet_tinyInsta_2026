@@ -132,4 +132,4 @@ Autrement dit, chaque entité lue par timeline coûte 0,42 $ pour 1 million de t
 
 Quand F passe de 25 à 30, le coût est multiplié par environ 30 (de 8,82 $ à 260,82 $). À F = 100, il est environ 96 fois plus élevé qu'à F = 25.
 
-**Limites.** Ces nombres d'entités sont déduits du code. Je ne les ai pas mesurés dans la facturation réelle. Ils ne comptent pas non plus les éventuelles lectures d'entrées 
+
