@@ -1,3 +1,4 @@
 N_instances,debit_max_req_par_s,debit_max_par_instance_req_par_s,C_saturation,rapport_au_plus_petit_N
 1,28.92,28.92,2,1.0
 2,53.74,26.87,4,1.86
+4,108.27,27.07,32,3.74
