@@ -133,3 +133,46 @@ Autrement dit, chaque entité lue par timeline coûte 0,42 $ pour 1 million de t
 Quand F passe de 25 à 30, le coût est multiplié par environ 30 (de 8,82 $ à 260,82 $). À F = 100, il est environ 96 fois plus élevé qu'à F = 25.
 
 
+
+
+### 2.2 Partie 2 : capacité
+
+**Question :** combien de timelines par seconde une instance peut-elle servir ? Le débit maximal est-il proportionnel au nombre d'instances ?
+
+#### Hypothèse
+
+**Ce que je lis dans le code.** Dans `app.yaml`, l'application est lancée avec `entrypoint: gunicorn -b :$PORT main:app`, sans aucune option. La documentation de gunicorn dit que le worker par défaut traite une seule requête à la fois (https://gunicorn.org/design/). Une instance n'a donc qu'un seul worker, et elle traite **une requête à la fois**. Avec N instances, N requêtes sont traitées en même temps.
+
+**Les deux outils utilisés.**
+- La loi de Little : latence ≈ C ÷ débit, donc débit = C ÷ latence.
+- Une instance qui traite une requête à la fois a un débit maximal de 1 ÷ (temps pendant lequel elle est occupée par une requête). Avec N instances, c'est N ÷ ce temps.
+
+**Les chiffres de la partie 1.** Avec C = 1 sur le jeu `base`, la latence médiane est d'environ 48 ms, soit un débit d'environ 20 requêtes par seconde. Mais la latence est le temps total vu par le client. L'instance n'est pas occupée pendant tout ce temps : une partie sert au voyage de la réponse sur le réseau. J'estime que l'instance est occupée la moitié de la latence, soit environ 24 ms (c'est le temps serveur de la partie 1). Son débit maximal est alors de 1 ÷ 0,024 s, soit environ 40 requêtes par seconde.
+
+C'est une estimation, pas une mesure. L'instance fait aussi d'autres choses (Flask, fabrication du JSON) que le temps serveur ne compte pas. Je considère donc que 40 requêtes par seconde est **au plus** ce qu'une instance peut faire.
+
+**La saturation.** La saturation arrive quand C × (temps d'occupation) dépasse la latence sans charge, c'est-à-dire pour C ≈ débit maximal × latence sans charge. Pour une instance : 40 × 0,048 s ≈ 1,92, soit **C ≈ 2**. Pour N instances, C ≈ 2N.
+
+| N (instances) | Débit maximal prédit | C de saturation prédit |
+|---|---|---|
+| 1 | environ 40 req/s | environ 2 |
+| 2 | environ 80 req/s | environ 4 |
+| 4 | environ 160 req/s | environ 8 |
+
+**La latence prédite.** Avant la saturation, la latence reste proche de celle de la partie 1, environ 48 ms. Après la saturation, les requêtes attendent leur tour, et la latence vaut environ C ÷ débit maximal. Par exemple, pour N = 1 et C = 16, elle vaut environ 16 ÷ 40 = 0,4 s, soit 400 ms. Je m'attends donc à ce que la loi de Little reste vraie après la saturation.
+
+**Proportionnalité.** En théorie, le débit maximal est proportionnel à N, car chaque instance traite ses requêtes seule, sans partager de mémoire avec les autres. Je m'attends à un gain proche de 4 en passant de 1 à 4 instances, peut-être un peu inférieur. Les instances partagent tout de même Datastore, et App Engine répartit les requêtes entre elles, ce qui peut être inégal. Si le gain est inférieur à 4, le goulot viendrait de l'un de ces deux points. Je le vérifierai avec la colonne `INSTANCE` (combien de requêtes sert chaque instance) et avec `SERVER_MS` (est-ce que le temps passé dans `get_timeline` monte avec C ?).
+
+#### Protocole
+
+<!-- À compléter : versions fixed1, fixed2, fixed4 (une à la fois, arrêtée après ses mesures), jeu base, C de 1 à 64, 60 s par run, échauffement non conservé, 5 premières secondes écartées, ordre des C mélangé (raw/p2_N<N>_order.txt), nombre d'instances vérifié (raw/p2_N<N>_instances_*.txt), dates. -->
+
+#### Figures
+
+<!-- À compléter : figures/fig2a.png et figures/fig2b.png, avec les paramètres fixés dans chaque légende. -->
+
+#### Interprétation
+
+<!-- À compléter : point de saturation pour chaque N, capacité d'une instance et ce qui la limite, loi de Little au-delà de la saturation, rapport entre 1 et 4 instances, ce que j'avais manqué. -->
+
+
