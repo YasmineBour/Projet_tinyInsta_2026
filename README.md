@@ -334,14 +334,72 @@ Les entités lues et le coût de 1 million de timelines (valeurs déduites du co
 
 #### Protocole
 
-<!-- À compléter : même protocole que la Fig. 1b (version à 1 instance fixe, une requête à la fois, 20 jeux f05 à f100, 60 s par run, ordre mélangé, 5 premières secondes écartées). Version corrigée `fixchunk`, déployée avec --no-promote, mêmes réglages que fixed1 (B1, manual scaling). Dates et heures. -->
+**Version testée.** J'ai déployé la version corrigée sous le nom `fixchunk`, avec l'option `--no-promote`. Elle a la même configuration que `fixed1` : une seule instance fixe de classe B1, sans autoscaling. Seul le code de `get_timeline` change. La version par défaut de l'application n'a pas été touchée.
+
+**Mesures.** J'ai refait exactement le protocole de la figure 1b :
+- une seule instance, une requête à la fois (Locust avec `-u 1`) ;
+- les 20 jeux `f05` à `f100` (U = 120, P = 20), un run de 60 secondes par jeu ;
+- les jeux sont lancés dans un ordre mélangé (graine fixe, ordre dans `raw/p3_order.txt`) ;
+- avant les mesures, un échauffement de 20 secondes sur le jeu `base`, non conservé ;
+- je retire les 5 premières secondes de chaque run et je ne garde que les réponses 200 ;
+- pour chaque run, je calcule la médiane du temps serveur (`Server-Timing`) et la médiane de la latence client.
+
+Les 20 runs ont été servis par une seule instance et ne contiennent que des réponses 200. Date : <!-- À compléter : date et heures (campagne de 10h19 à 10h40) -->.
+
+**Un incident.** Ma première tentative a échoué : tous les runs ont renvoyé 0 requête. Le script bloquait Locust à son démarrage (une erreur de ma commande de délai maximal, qui lui retirait l'accès au terminal). J'ai corrigé le script et j'ai refait toute la campagne. Les journaux des tentatives ratées ne sont pas utilisés.
+
+**Reproductibilité.** `python3 scripts/appliquer_correctif_p3.py` applique la correction à `main.py`. `bash scripts/campagne_p3.sh` lance les mesures. `python3 scripts/analyse_p3.py` (ou `bash scripts/regenerer_figures.sh`) régénère la figure et les CSV.
 
 #### Figure
 
-<!-- À compléter : figures/fig3.png (avant et après sur la même figure), figures/fig3.csv, figures/fig3_cout.csv. -->
+![Fig. 3](figures/fig3.png)
+
+**Fig. 3** : avant et après la correction, sur la même figure. Temps serveur médian et latence client médiane en fonction de F (U = 120, P = 20), une instance, une requête à la fois. À gauche, échelle linéaire. À droite, temps serveur en échelle logarithmique. Valeurs tracées : `figures/fig3.csv`. Entités lues et coût déduits du code : `figures/fig3_cout.csv`.
 
 #### Interprétation
 
-<!-- À compléter : le gain obtenu (ou son absence), comparaison avec les prédictions ci-dessus, ce que j'avais manqué, vérification que les timelines renvoyées sont identiques, coût réel de la correction (complexité, argent, cohérence). -->
+**Résultat en une phrase.** La correction apporte un gain net pour F ≥ 30. Le temps serveur est divisé par 9 à 18 selon F. Pour F ≤ 25, il n'y a pas de gain.
+
+| F | Temps serveur avant | Temps serveur après | Gain | Latence client avant | Latence client après | Requêtes servies en 60 s, avant puis après | Entités lues, avant puis après | Coût d'un million de timelines, avant puis après |
+|---|---|---|---|---|---|---|---|---|
+| 25 | 26,9 ms | 31,6 ms | × 0,85 | 50,2 ms | 59,3 ms | 1 064 puis 908 | 21 puis 21 | 8,82 $ puis 8,82 $ |
+| 30 | 420,9 ms | 46,3 ms | × 9,1 | 443,8 ms | 74,2 ms | 119 puis 729 | 621 puis 41 | 260,82 $ puis 17,22 $ |
+| 60 | 896,3 ms | 71,2 ms | × 12,6 | 921,9 ms | 100,4 ms | 57 puis 535 | 1 221 puis 61 | 512,82 $ puis 25,62 $ |
+| 100 | 1 318,8 ms | 91,4 ms | × 14,4 | 1 341,8 ms | 119,3 ms | 39 puis 451 | 2 021 puis 81 | 848,82 $ puis 34,02 $ |
+
+Le gain le plus grand est de × 18,1, à F = 95. À F = 100, l'application sert 451 requêtes en 60 secondes, contre 39 avant.
+
+**Mon hypothèse comparée aux mesures.**
+
+| Ce que j'avais prédit | Ce que j'ai mesuré | Verdict |
+|---|---|---|
+| Pour F ≤ 29, rien ne change | Le temps serveur est un peu plus haut : de 2 à 5 ms | Presque juste |
+| À F = 30, le temps est beaucoup plus proche de 27 ms que de 420 ms | 46 ms | Confirmé |
+| Temps d'au plus 27 ms × nombre de requêtes : 54, 81 et 108 ms | 46 ms (F = 30), 71 ms (F = 60), 91 ms (F = 100) | Confirmé : toutes les valeurs sont sous ces bornes |
+| La courbe est un escalier, avec une marche tous les 30 comptes suivis | Marches visibles à F = 30, 60 et 90 | Confirmé |
+| Moins d'entités lues, donc un coût plus bas | 41, 61 et 81 entités au lieu de 621 à 2 021 (valeurs déduites du code) | Confirmé sur le papier |
+
+**Pourquoi le gain est si grand.** Avant, une timeline à F = 100 faisait 101 requêtes l'une après l'autre, d'environ 13 ms chacune. Après, elle en fait 4. Elle lit aussi 81 entités au lieu de 2 021. Le temps passe donc de 1 319 ms à 91 ms, et le coût d'un million de timelines de 849 $ à 34 $, soit 25 fois moins. Cette dernière valeur est déduite du code, je ne l'ai pas mesurée dans la facturation.
+
+**Ce que j'avais manqué ou mal estimé.**
+- **Pour F ≤ 25, la version corrigée est un peu plus lente** : de 2 à 5 ms de plus sur le temps serveur (par exemple 26,6 ms au lieu de 24,5 ms à F = 5). Je ne pense pas que ce soit à cause du code : pour F ≤ 25 il n'y a qu'un seul groupe, donc le code fait presque la même chose qu'avant. De plus, la partie de la latence qui ne vient pas de `get_timeline` (la différence entre la latence client et le temps serveur) passe d'environ 23 ms à environ 28 ms, alors que le code ne la touche pas. Les deux séries de mesures n'ont pas été faites le même jour. Je pense donc à une différence entre sessions, mais je ne l'ai pas démontré.
+- **Chaque groupe ajouté coûte environ 15 à 21 ms**, pas 27 ms. Les 27 ms que je prenais comme base comprenaient aussi la lecture de l'utilisateur, qui n'est faite qu'une fois.
+- **Le temps monte aussi un peu à l'intérieur d'une marche** (46 ms à F = 30 et 53 ms à F = 45, par exemple). Le nombre de requêtes n'explique donc pas tout : une requête avec plus d'auteurs prend un peu plus de temps.
+
+**Est-ce que ça passe à l'échelle sur F ?** Le sujet demande que le temps reste à peu près constant quand le paramètre est multiplié par 10. Avant, de F = 5 à F = 50, le temps serveur est multiplié par 31. Après, il est multiplié par 2. De F = 10 à F = 100, il est multiplié par 50 avant la correction, et par 3 après. Ce n'est pas constant, mais c'est bien meilleur.
+
+**Ce que la correction coûte.**
+- **Complexité :** une dizaine de lignes de code en plus (le découpage en groupes et le tri). Le code est un peu plus long à lire.
+- **Argent :** la correction ne coûte rien de plus à faire tourner. Elle fait baisser le nombre de lectures Datastore, donc la facture, dès que F dépasse 29. Elle ne change rien pour F ≤ 29.
+- **Cohérence des données :** je ne change aucune donnée. Mais on fait plusieurs requêtes à des instants légèrement différents, donc un post écrit entre deux requêtes peut apparaître ou non dans la timeline. L'ancienne boucle avait déjà ce défaut, mais ce n'est pas aussi cohérent qu'une seule requête.
+- **Erreurs :** j'ai supprimé le `try / except` silencieux. Si Datastore refuse une requête, on le verra maintenant au lieu d'avoir un ralentissement caché.
+- **Vérification des résultats :** <!-- À compléter : résultat de la comparaison des timelines de l'ancienne et de la nouvelle version (f05, f20, f30, f100), affichée au début de la campagne -->
+
+**Ce que la correction ne règle pas.** Les requêtes restent envoyées l'une après l'autre. Le temps continue donc d'augmenter avec F, par paliers : il est de 46 ms à F = 30 et de 91 ms à F = 100. Pour aller plus loin, on pourrait envoyer les requêtes en parallèle, ou calculer la timeline de chaque utilisateur à l'écriture d'un post. Je n'ai testé aucune de ces deux idées.
+
+**Limites.**
+- Chaque jeu n'est mesuré qu'une seule fois, avant comme après.
+- Les mesures d'avant (partie 1) et d'après (partie 3) n'ont pas été faites le même jour, ce qui peut expliquer les 2 à 5 ms d'écart à F ≤ 25.
+- Les entités lues et les coûts sont déduits du code, pas mesurés dans la facturation.
 
 
