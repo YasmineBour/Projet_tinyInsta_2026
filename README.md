@@ -285,8 +285,63 @@ Le résumé de tous les runs est dans `figures/resume_p2.csv`, et la capacité d
 - Pour N = 4 et C = 2, le journal contient 6 identifiants d'instance au lieu de 4. La liste des instances relevée avant et après la campagne montre que deux instances ont été remplacées par App Engine pendant la campagne. Je n'ai pas identifié la cause. Ce run ne contient aucune requête en échec et son débit est cohérent avec celui de N = 2 à la même concurrence.
 - Les requêtes en échec (code HTTP 0) vont de 0 à 9 par run, soit moins de 0,5 % des requêtes. Elles apparaissent à partir de C = 8 (une seule pour N = 4 à C = 4).
 - Le sujet limite C à 64 et N à 4. Le débit maximal de N = 4 n'est donc peut-être pas atteint.
+- 
+### Partie 3 : corriger et re-mesurer
+
+**Goulot choisi.** Le passage de `get_timeline` à la méthode boucle quand F ≥ 30. En partie 1, le temps serveur saute de 27 ms (F = 25) à 421 ms (F = 30), puis monte jusqu'à 1 319 ms (F = 100). Une timeline lit aussi beaucoup plus d'entités : 2 021 à F = 100, contre 21 pour F ≤ 29.
+
+#### Hypothèse
+
+**Mon idée de départ.** Je voulais que `get_timeline` n'utilise que la méthode IN, pour ne jamais passer dans la boucle. Ce n'est pas possible tel quel : Datastore refuse un `IN` de plus de 30 valeurs (message d'erreur « IN supports up to 30 values » dans mon test). J'ai donc retenu l'autre idée : faire en sorte que la boucle se comporte comme le IN.
+
+**La correction.** Je découpe la liste des auteurs (les F comptes suivis et l'utilisateur lui-même) en groupes de 30 au plus. Je fais une requête IN par groupe, avec `limit=20`. Je rassemble les résultats, je les trie par date et je garde les 20 plus récents. Le résultat reste correct : les 20 posts les plus récents de l'ensemble font forcément partie des 20 plus récents de leur groupe.
+
+**Ce que ça apporte.**
+- Le nombre de requêtes passe de F + 1 à (F + 1) ÷ 30, arrondi vers le haut. À F = 100, on fait 4 requêtes au lieu de 101.
+- Moins de requêtes veut dire moins d'allers-retours vers Datastore, donc un temps serveur plus court.
+- Moins d'entités lues : 1 + 20 × (nombre de requêtes), car chaque requête renvoie au plus 20 posts.
+
+**Ce que ça coûte.**
+- **Complexité :** quelques lignes en plus (le découpage en groupes et le tri en Python).
+- **Les requêtes restent envoyées l'une après l'autre.** Le temps continue donc d'augmenter avec F, par paliers. La correction ne rend pas la timeline indépendante de F.
+- **Cohérence des données :** on fait plusieurs requêtes à des instants légèrement différents, donc un post écrit entre deux requêtes peut apparaître ou non. La boucle actuelle avait déjà ce défaut. Ce n'est pas aussi cohérent qu'une seule requête, mais je ne change aucune donnée.
+- **Erreurs :** ma version supprime le `try / except` silencieux. Si une requête échoue, on aura une vraie erreur et plus un ralentissement caché.
+- **Argent :** ça coûte moins cher (voir le tableau plus bas).
+
+**Une autre solution, que je ne retiens pas :** calculer la timeline de chaque utilisateur au moment où un post est écrit. La lecture serait très rapide, mais chaque écriture devrait être copiée chez tous les abonnés, et il faudrait gérer ce qui se passe quand quelqu'un suit ou arrête de suivre quelqu'un. C'est beaucoup plus compliqué.
+
+**Ce que je prédis.**
+- Pour F ≤ 29, rien ne change : on reste dans la méthode IN, avec une seule requête, soit environ 27 ms.
+- Pour F ≥ 30, toutes les requêtes passent dans la méthode IN, par groupes de 30. Comme elles sont envoyées l'une après l'autre, le temps sera plus grand qu'à F ≤ 29, mais bien plus petit que dans l'ancienne boucle. À F = 30, je m'attends à un temps beaucoup plus proche de 27 ms que de 420 ms.
+- Si une requête IN prend environ 27 ms, le temps est d'environ 27 ms multiplié par le nombre de requêtes, au plus. Les 27 ms comprennent aussi la lecture de l'utilisateur, donc le temps réel sera peut-être un peu plus bas.
+- La courbe aura la forme d'un **escalier** : le temps ne change pas tant que le nombre de requêtes reste le même, puis il saute d'environ 27 ms tous les 30 comptes suivis.
+
+| F | Nombre d'auteurs | Nombre de requêtes IN | Temps serveur prédit (au plus) | Temps serveur mesuré avant la correction |
+|---|---|---|---|---|
+| 5 à 29 | 6 à 30 | 1 | environ 27 ms | 24 à 27 ms |
+| 30 à 59 | 31 à 60 | 2 | environ 54 ms | 421 à 897 ms |
+| 60 à 89 | 61 à 90 | 3 | environ 81 ms | 896 à 1 326 ms |
+| 90 à 100 | 91 à 101 | 4 | environ 108 ms | 1 326 à 1 588 ms |
+
+Les entités lues et le coût de 1 million de timelines (valeurs déduites du code avec 0,042 $ pour 100 000 lectures, pas encore mesurées) :
+
+| F | Entités lues avant | Entités lues après | Coût de 1 million de timelines avant | Coût de 1 million de timelines après |
+|---|---|---|---|---|
+| 25 | 21 | 21 | 8,82 $ | 8,82 $ |
+| 30 | 621 | 41 | 260,82 $ | 17,22 $ |
+| 60 | 1 221 | 61 | 512,82 $ | 25,62 $ |
+| 100 | 2 021 | 81 | 848,82 $ | 34,02 $ |
+
+#### Protocole
+
+<!-- À compléter : même protocole que la Fig. 1b (version à 1 instance fixe, une requête à la fois, 20 jeux f05 à f100, 60 s par run, ordre mélangé, 5 premières secondes écartées). Version corrigée `fixchunk`, déployée avec --no-promote, mêmes réglages que fixed1 (B1, manual scaling). Dates et heures. -->
+
+#### Figure
+
+<!-- À compléter : figures/fig3.png (avant et après sur la même figure), figures/fig3.csv, figures/fig3_cout.csv. -->
+
 #### Interprétation
 
-<!-- À compléter : point de saturation pour chaque N, capacité d'une instance et ce qui la limite, loi de Little au-delà de la saturation, rapport entre 1 et 4 instances, ce que j'avais manqué. -->
+<!-- À compléter : le gain obtenu (ou son absence), comparaison avec les prédictions ci-dessus, ce que j'avais manqué, vérification que les timelines renvoyées sont identiques, coût réel de la correction (complexité, argent, cohérence). -->
 
 
