@@ -35,8 +35,22 @@ TEMPLATE_INDEX = '''
 {% endif %}
 '''
 
+MAX_IN = 30  # Datastore refuse un filtre IN de plus de 30 valeurs
+
+
+def _groupes(liste, taille):
+    """Decoupe une liste en morceaux de `taille` elements au plus."""
+    for i in range(0, len(liste), taille):
+        yield liste[i:i + taille]
+
+
 def get_timeline(user: str, limit: int = 20):
-    """Retourne la liste des posts (entités) pour la timeline d'un utilisateur."""
+    """Retourne la liste des posts (entites) pour la timeline d'un utilisateur.
+
+    Correction (partie 3) : les auteurs sont envoyes a Datastore par groupes de
+    30 au plus (une requete IN par groupe), au lieu d'une requete par auteur
+    quand il y a plus de 30 auteurs.
+    """
     if not user:
         return []
     follow_key = client.key('User', user)
@@ -46,31 +60,15 @@ def get_timeline(user: str, limit: int = 20):
         follows = user_entity.get('follows', [])
     follows = list({*follows, user})
 
-    timeline = []
-    used_gql = False
-    try:
-        if hasattr(client, 'gql'):
-            gql = client.gql("SELECT * FROM Post WHERE author IN @authors ORDER BY created DESC")
-            gql.bindings["authors"] = follows
-            timeline = list(gql.fetch(limit=limit))
-            used_gql = True
-    except Exception:
-        pass
-    if not used_gql:
-        try:
-            query = client.query(kind='Post')
-            query.add_filter('author', 'IN', follows)
-            query.order = ['-created']
-            timeline = list(query.fetch(limit=limit))
-        except Exception:
-            posts = []
-            for author in follows:
-                q = client.query(kind='Post')
-                q.add_filter('author', '=', author)
-                q.order = ['-created']
-                posts.extend(list(q.fetch(limit=limit)))
-            timeline = sorted(posts, key=lambda p: p.get('created'), reverse=True)[:limit]
-    return timeline
+    posts = []
+    for groupe in _groupes(follows, MAX_IN):
+        query = client.query(kind='Post')
+        query.add_filter('author', 'IN', groupe)
+        query.order = ['-created']
+        posts.extend(list(query.fetch(limit=limit)))
+    # Les `limit` posts les plus recents de l'ensemble font partie des `limit`
+    # plus recents de leur groupe : on trie l'ensemble puis on garde `limit` posts.
+    return sorted(posts, key=lambda p: p.get('created'), reverse=True)[:limit]
 
 
 def seed_data(users: int = 5, posts: int = 30, follows_min: int = 1, follows_max: int = 3, prefix: str = 'user'):
