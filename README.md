@@ -402,4 +402,26 @@ Le gain le plus grand est de × 18,1, à F = 95. À F = 100, l'application sert 
 - Les mesures d'avant (partie 1) et d'après (partie 3) n'ont pas été faites le même jour, ce qui peut expliquer les 2 à 5 ms d'écart à F ≤ 25.
 - Les entités lues et les coûts sont déduits du code, pas mesurés dans la facturation.
 
+## Conclusion : TinyInsta passe-t-elle à l'échelle ?
+
+**Réponse.** Pas complètement. TinyInsta passe à l'échelle sur le nombre d'utilisateurs (U), sur le nombre de posts par utilisateur (P) et sur le nombre d'instances (N). Elle ne passe pas à l'échelle sur le nombre de comptes suivis (F), même après ma correction. La correction rend F bien meilleur, mais le temps de réponse continue d'augmenter avec F.
+
+Le sujet donne deux sens à « passer à l'échelle » : quand un paramètre des données est multiplié par 10, le temps d'une requête reste à peu près constant ; et quand le nombre d'instances est multiplié par k, le débit maximal est multiplié par environ k.
+
+**Ce qui passe à l'échelle.**
+- **U : oui.** Le temps serveur passe de 22,8 ms (U = 100) à 26,0 ms (U = 10 000). Il n'augmente que de 3 ms alors qu'il y a 100 fois plus d'utilisateurs. La timeline ne lit que l'utilisateur demandé et 20 posts, quelle que soit la taille de la base.
+- **P : oui, presque.** Le temps passe de 23,5 ms (P = 10) à 29,1 ms (P = 1 000), soit 24 % de plus pour 100 fois plus de posts. La requête s'arrête à 20 posts (`limit=20`).
+- **N : oui.** Avec 2 instances, le débit maximal est multiplié par 1,9. Avec 4 instances, il est multiplié par 3,8. Chaque instance travaille seule, donc les instances s'additionnent presque parfaitement.
+
+**Ce qui ne passe pas à l'échelle : F.**
+- Dans la version d'origine, le temps serveur saute de 27 ms (F = 25) à 421 ms (F = 30), puis monte jusqu'à 1 319 ms (F = 100). De F = 10 à F = 100, le temps est multiplié par 50.
+- La raison est que `IN` accepte au plus 30 valeurs. Au-delà, le code passe en silence à une requête par auteur, envoyées l'une après l'autre.
+- Avec ma correction (des requêtes `IN` par groupes de 30), le temps passe de 28 ms (F = 10) à 91 ms (F = 100). Il est multiplié par 3 au lieu de 50, et le coût de 1 million de timelines baisse de 849 $ à 34 $ (valeur déduite du code). Mais le temps n'est pas constant : il monte par paliers, une marche tous les 30 comptes suivis, car les requêtes restent envoyées l'une après l'autre.
+
+**Jusqu'où.** U jusqu'à 10 000 utilisateurs, P jusqu'à 1 000 posts par utilisateur, et N jusqu'à 4 instances, qui sont les valeurs que j'ai testées. Pour F, la version d'origine tient jusqu'à F = 29. Avec la correction, le temps reste sous 100 ms jusqu'à F = 100. Je n'ai rien mesuré au-delà.
+
+**Une limite sur les instances.** Le débit est proportionnel au nombre d'instances, mais chaque instance ne sert qu'environ 28 timelines par seconde. Le worker `gunicorn` traite une seule requête à la fois, et il attend Datastore pendant ce temps. Pour servir beaucoup de requêtes, il faudrait donc beaucoup d'instances. Cela passe à l'échelle, mais pas de façon économique. Je n'ai testé qu'au plus 4 instances et 64 utilisateurs simultanés.
+
+**En résumé.** Les données de taille (U et P) et les instances passent à l'échelle. Le nombre de comptes suivis (F) est le point faible, parce que le coût d'une timeline dépend du nombre de requêtes envoyées à Datastore, et que ce nombre augmente avec F. Ma correction le réduit beaucoup, sans le supprimer. Pour aller plus loin, il faudrait envoyer ces requêtes en parallèle, ou calculer la timeline de chaque utilisateur à l'écriture d'un post. Je n'ai testé aucune de ces deux idées.
+
 
