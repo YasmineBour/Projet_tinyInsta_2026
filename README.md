@@ -1,4 +1,46 @@
-## Partie 1 : coût d'une requête
+# Projet Données Massives et Cloud : TinyInsta passe-t-elle à l'échelle ?
+
+**Benchmark, édition 2026. Rendu individuel. Yasmine Bour.**
+
+- Application déployée (version par défaut) : https://tinyinsta-510215.oa.r.appspot.com
+- Dépôt : https://github.com/YasmineBour/Projet_tinyInsta_2026
+
+**Réponse en une phrase.** TinyInsta passe à l'échelle sur le nombre d'utilisateurs (U), sur le nombre de posts par utilisateur (P) et sur le nombre d'instances (N). Elle ne passe pas à l'échelle sur le nombre de comptes suivis (F), même après ma correction, qui réduit pourtant beaucoup le temps de réponse (voir la conclusion).
+
+**Sommaire.** 1. Montage, 2. Résultats des parties 1 à 3, 3. Tableau des verdicts (et conclusion), 4. Validité, 5. Coût de la campagne, puis l'organisation du dépôt.
+
+---
+
+## 1. Montage
+
+**Projet et région.** Projet GCP `tinyinsta-510215`. L'application tourne sur App Engine en région `europe-west6` (Zurich). Les données sont dans Cloud Datastore (Firestore en mode Datastore).
+
+**D'où tourne le client.** Locust 2.47.0 (Python 3.12) est lancé depuis Cloud Shell. La machine Cloud Shell est en zone `europe-west1-b` (Belgique), lue avec le serveur de métadonnées de Google. Le client et l'application ne sont donc pas dans la même région.
+
+**Versions de l'application.**
+
+| Version | Instances | Classe | Utilisée pour | Date (heures en UTC) |
+|---|---|---|---|---|
+| `20260930t152203` (version par défaut) | autoscaling, au plus 10 | F1 | URL rendue, doit rester fonctionnelle. Elle contient l'ancien code. | déployée le 30/09/2026 |
+| `fixed1` | 1 fixe | B1 | Partie 1 (26 runs) | 30/10/2026, de 19h06 à 19h33 environ |
+| `fixed1b` | 1 fixe | B1 | Partie 2, N = 1 | 09/11/2026, de 10h15 à 10h37 (deux sessions) |
+| `fixed2` | 2 fixes | B1 | Partie 2, N = 2 | 09/11/2026, de 10h56 à 11h03 |
+| `fixed4` | 4 fixes | B1 | Partie 2, N = 4 | 09/11/2026, de 11h11 à 11h19 environ |
+| `fixchunk` | 1 fixe | B1 | Partie 3 (version corrigée, déployée avec `--no-promote`) | 19/11/2026, de 10h19 à 10h40 |
+
+Les versions `fixedN` et `fixchunk` utilisent la classe B1, imposée par le script `deploy_fixed.sh`, alors que la version par défaut utilise F1. Le fichier `main.py` du dépôt contient la correction de la partie 3, mais la version par défaut déployée contient toujours l'ancien code, car `fixchunk` n'a pas été promue. Chaque version `fixedN` et `fixchunk` a été arrêtée après ses mesures.
+
+**Jeux de données.** 26 jeux, environ 400 000 entités, générés un par un avec `bench/seed_exact.py` : `base`, `u100`, `u10000`, `p10`, `p100`, `p1000` et `f05` à `f100`. <!-- À compléter : dates de génération -->
+
+**Deux incidents.**
+- La version `fixed1` est restée bloquée par une opération App Engine en attente (déploiement par-dessus une version arrêtée). J'ai donc utilisé `fixed1b` pour N = 1 en partie 2, avec exactement la même configuration.
+- Ma première campagne de la partie 3 a donné des runs vides à cause d'une erreur dans mon script (une commande de délai maximal empêchait Locust de démarrer). J'ai corrigé le script et refait toute la campagne.
+
+---
+
+## 2. Résultats des parties 1 à 3
+
+### 2.1 Partie 1 : coût d'une requête
 
 **Question :** de quoi dépend le temps de traitement d'une timeline ?
 
@@ -20,9 +62,9 @@ En lisant `get_timeline` dans `main.py`, je remarque que la fonction contient de
 
 #### Protocole
 
-**Montage.** Version `fixed1` on garanti ainsi exactement 1 instance, sans autoscaling, une requête à la fois (Locust `-u 1 -r 1`). Projet GCP `tinyinsta-510215`, région App Engine `europe-west6`. Client de charge : Locust 2.47.0, lancé depuis Cloud Shell. Mesures réalisées le 30/10/2026.
+**Montage.** Version `fixed1` (exactement 1 instance, sans autoscaling), une requête à la fois (Locust `-u 1 -r 1`). Projet GCP `tinyinsta-510215`, région App Engine `europe-west6`. Client de charge : Locust 2.47.0, lancé depuis Cloud Shell. Mesures réalisées le 30/10/2026.
 
-**Jeux de données.** Chaque jeu est généré avec `bench/seed_exact.py`. Un seul facteur varie à la fois, les autres restent à leur valeur de référence.
+**Jeux de données.** Chaque jeu est généré avec `bench/seed_exact.py` (exactement P posts et F followees par utilisateur). Un seul facteur varie à la fois, les autres restent à leur valeur de référence.
 
 | Facteur étudié | Jeux utilisés | U | P | F |
 |---|---|---|---|---|
@@ -30,16 +72,24 @@ En lisant `get_timeline` dans `main.py`, je remarque que la fonction contient de
 | P | `p10`, `u100`, `p100`, `p1000` | 100 | 10 / 20 / 100 / 1 000 | 20 |
 | F | `f05`, `f10`, ..., `f100` (20 jeux) | 120 | 20 | 5 / 10 / ... / 100 |
 
+Le point P = 20 de la courbe de P est mesuré sur `u100` (U = 100, P = 20, F = 20), qui est le seul jeu à 100 utilisateurs et 20 posts.
+
 **Déroulement.**
 - 26 runs, un par jeu, de 60 secondes chacun. Chaque run produit un journal brut `raw/<jeu>.csv` (une ligne par requête : latence client, temps serveur, code HTTP, instance).
+- Avant la campagne, un échauffement de 20 secondes sur `base` (non conservé) évite que le démarrage à froid de l'instance fausse le premier run.
 - Les runs sont lancés dans un **ordre mélangé** (tirage avec graine fixe, enregistré dans `raw/order.txt`), pour que l'ordre n'avantage ni ne pénalise un facteur plus qu'un autre.
+- Avant chaque run, le script vérifie que la timeline d'un utilisateur du jeu renvoie bien 20 posts.
 - Chaque jeu n'est mesuré qu'une seule fois.
 
 **Traitement.**
+- Les 5 premières secondes de chaque run sont écartées. Le journal brut les conserve.
+- Seules les réponses HTTP 200 sont gardées pour les médianes.
 - Pour chaque run, on calcule la médiane du temps serveur (`SERVER_MS`, en-tête `Server-Timing`, durée de `get_timeline`) et la médiane de la latence client (`LATENCY_MS`, mesurée par Locust).
 - Le nombre d'instances qui ont réellement répondu est compté à partir de la colonne `INSTANCE` (en-tête `X-Instance`) : il vaut 1 pour les 26 runs. Les 26 runs n'ont renvoyé que des codes 200.
 
 **Reproductibilité.** `scripts/campagne_p1.sh` lance les mesures. `python3 scripts/analyse_p1.py` lit `raw/` et régénère tous les CSV et PNG de `figures/` ainsi que le résumé `figures/resume_p1.csv`.
+
+**Utilisateur interrogé.** D'après `bench/locustfile.py`, chaque utilisateur Locust interroge un utilisateur TinyInsta qui lui est propre, pris dans l'ordre (`<jeu>_u00000`, puis `_u00001`, etc.). Avec `-u 1`, chaque run mesure donc toujours le même utilisateur, `<jeu>_u00000`. Voir la section 4 (question 5).
 
 #### Figures
 
@@ -52,9 +102,10 @@ En lisant `get_timeline` dans `main.py`, je remarque que la fonction contient de
 **Fig. 1b** : temps serveur médian et latence client médiane (ms) en fonction de F, pour 20 valeurs de F (U = 120, P = 20). `fixed1`, une requête à la fois. Valeurs tracées : `figures/fig1b.csv`.
 
 Le résumé de tous les runs (nombre de requêtes, instances distinctes, codes HTTP, médianes) est dans `figures/resume_p1.csv`.
+
 #### Interprétation et réponses aux questions
 
-Dans `get_timeline`, il y a deux façons de récupérer les posts. J'appelle la première la **méthode IN** : une seule requête qui demande les posts de tous les auteurs d'un coup. J'appelle la deuxième la **méthode boucle** : une requête par auteur, l'une après l'autre.
+Dans `get_timeline`, il y a deux façons de récupérer les posts. J'appelle la première la **méthode IN** : une seule requête qui demande les posts de tous les auteurs d'un coup. J'appelle la deuxième la **méthode boucle** : une requête par auteur, l'une après l'autre. Le code contient aussi une version GQL, mais elle ne s'exécute jamais chez moi, car `client.gql` n'existe pas dans la bibliothèque installée.
 
 Le code essaie d'abord la méthode IN. Si Datastore refuse, l'erreur est attrapée par le `except` et le code passe à la méthode boucle, sans afficher aucun message.
 
@@ -64,8 +115,9 @@ J'ai fait un test directement sur Datastore avec des `IN` de plus en plus grands
 
 **U : confirmé.** Je pensais que U n'avait pas d'effet, car l'utilisateur est donné en paramètre. Les mesures donnent 22,8 ms pour U = 100 et 26,0 ms pour U = 10 000. Le temps serveur ne monte que de 3 ms alors qu'il y a 100 fois plus d'utilisateurs.
 
-**P : plutôt réfuté.** Je pensais que le temps augmentait avec P, car la requête parcourt tous les posts avant d'en renvoyer 20. Les mesures donnent 23,5 ms pour P = 10 et 29,1 ms pour P = 1 000. Le temps augmente d'environ 6 ms alors que P est multiplié par 100. Si la requête lisait tous les posts, le temps serait bien plus grand. Je n'avais pas vu le `limit=20` : la requête s'arrête dès qu'elle a 20 posts. Une explication probable (mais pas certaine) est que l'index `(author, created desc)` donne déjà les posts triés par date, donc Datastore lit directement les plus récents.
-**F : plutôt confirmé.** Je pensais que le temps augmentait avec F à cause de la boucle. C'est vrai, mais seulement à partir de F = 30. Jusqu'à F = 25, le temps est presque plat (24,5 ms à F = 5 et 26,9 ms à F = 25). À F = 30, il saute à 420,9 ms. Ensuite il monte presque droit jusqu'à 1 318,8 ms à F = 100. Cela fait environ 13 ms par auteur (420,9 ms pour 31 auteurs et 1 318,8 ms pour 101 auteurs). De ce que je comprends chaque requête de la boucle est un aller-retour vers Datastore. Le code parcourt toute la liste des followees, pour chacun, il demande ses posts à Datastore (l’aller), puis il attend la réponse (le retour) avant d’interroger Datastore pour le suivant dans la liste.
+**P : plutôt réfuté.** Je pensais que le temps augmentait avec P, car la requête parcourt tous les posts avant d'en renvoyer 20. Les mesures donnent 23,5 ms pour P = 10 et 29,1 ms pour P = 1 000. Le temps augmente d'environ 6 ms alors que P est multiplié par 100. Si la requête lisait tous les posts, le temps serait bien plus grand. Je n'avais pas vu le `limit=20` : la requête s'arrête dès qu'elle a 20 posts. Une explication probable est que l'index `(author, created desc)` donne déjà les posts triés par date, donc Datastore lit directement les plus récents. Je ne l'ai pas mesuré, donc je dis « probablement ».
+
+**F : le sens est confirmé, mais pas la forme.** Je pensais que le temps augmentait avec F à cause de la boucle. C'est vrai, mais seulement à partir de F = 30. Jusqu'à F = 25, le temps est presque plat (24,5 ms à F = 5 et 26,9 ms à F = 25). À F = 30, il saute à 420,9 ms. Ensuite il monte presque droit jusqu'à 1 318,8 ms à F = 100. Cela fait environ 13 ms par auteur (420,9 ms pour 31 auteurs et 1 318,8 ms pour 101 auteurs). Chaque requête de la boucle est un aller-retour vers Datastore, et la boucle les fait l'un après l'autre.
 
 **Ce que j'avais manqué :**
 - La limite de 30 valeurs pour `IN`.
@@ -74,7 +126,7 @@ J'ai fait un test directement sur Datastore avec des `IN` de plus en plus grands
 
 ##### Question 2 : quelle part de la latence client est due au réseau ?
 
-Sur la figure 1b, la latence client est toujours un peu plus grande que le temps serveur. On le voit facilement car la courbe orange est toujours supérieur a la bleu. La différence est d'environ 23 ms, quel que soit F (entre 22 et 26 ms selon les runs). Elle ne change pas quand le temps serveur monte, j'en déduis donc qu'elle ne dépend pas du travail fait dans Datastore.
+Sur la figure 1b, la latence client est toujours un peu plus grande que le temps serveur. La différence est d'environ 23 ms, quel que soit F (entre 22 et 26 ms selon les runs). Elle ne change pas quand le temps serveur monte, donc elle ne dépend pas du travail fait dans Datastore.
 
 La part en pourcentage, elle, change beaucoup avec F :
 
@@ -98,13 +150,13 @@ Une entité est un objet stocké dans Datastore, ici un `User` ou un `Post`. Goo
 - Ensuite, une seule requête demande les posts de tous les auteurs, avec `limit=20`. Datastore s'arrête à 20 résultats. C'est **20 entités** `Post`, même si les auteurs ont beaucoup plus de posts.
 - Au total : 1 + 20 = **21 entités**.
 
-**Méthode boucle (F à partir de 30) : beaucoup plus.(logique)**
+**Méthode boucle (F à partir de 30) : beaucoup plus.**
 - Il y a toujours **1 entité** `User`.
 - Ensuite, le code fait une requête par auteur, et il y a F + 1 auteurs. Le `limit=20` s'applique à **chaque requête**, donc chaque auteur donne jusqu'à 20 posts.
 - Au total : 1 + 20 × (F + 1) entités.
 - Pour F = 30 : 31 auteurs × 20 = 620, plus 1 = **621 entités**.
 - Pour F = 100 : 101 auteurs × 20 = 2 020, plus 1 = **2 021 entités**.
-- À la fin, le code trie tous ces posts et n'en garde que 20. Tout le reste a été lu, payé, et jeté (quel gâchis).
+- À la fin, le code trie tous ces posts et n'en garde que 20. Tout le reste a été lu, payé, puis jeté.
 
 **Selon U, P et F :**
 - **U** ne change rien : 21 entités. On lit toujours un `User` et 20 posts.
@@ -132,8 +184,9 @@ Autrement dit, chaque entité lue par timeline coûte 0,42 $ pour 1 million de t
 
 Quand F passe de 25 à 30, le coût est multiplié par environ 30 (de 8,82 $ à 260,82 $). À F = 100, il est environ 96 fois plus élevé qu'à F = 25.
 
+**Limites.** Ces nombres d'entités sont déduits du code. Je ne les ai pas mesurés dans la facturation réelle. Ils ne comptent pas non plus les éventuelles lectures d'entrées d'index.
 
-
+---
 
 ### 2.2 Partie 2 : capacité
 
@@ -177,7 +230,7 @@ Pour N = 1, j'ai utilisé `fixed1b` et non `fixed1`. La version `fixed1` était 
 - Les C d'une même version sont lancés dans un ordre mélangé (tirage avec graine fixe, enregistré dans `raw/p2_N<N>_order.txt`).
 - Avant les mesures, le script vérifie que la version est `SERVING`, qu'elle a bien N instances, que le jeu `base` renvoie 20 posts et que les en-têtes `X-Instance` et `Server-Timing` sont présents.
 - Chaque (N, C) n'est mesuré qu'une seule fois.
-- Dates : le 9 novembre 2026. `fixed1b` entre 10h15 et 10h37 (en deux sessions, voir les limites), `fixed2` entre 10h56 et 11h03, `fixed4` : <!-- À compléter : date et heures -->.
+- Dates : le 9 novembre 2026. `fixed1b` entre 10h15 et 10h37 (en deux sessions, voir les limites), `fixed2` entre 10h56 et 11h03, `fixed4` : entre 11h11 et 11h19 environ (heures en UTC).
 
 **Traitement.**
 - Je retire les 5 premières secondes de chaque run et je ne garde que les réponses HTTP 200.
@@ -253,7 +306,7 @@ Le résumé de tous les runs est dans `figures/resume_p2.csv`, et la capacité d
 | 2 | 64 | 4 | 3,6 % |
 | 4 | 64 | 3 | 1,3 % |
 
-- Mon explication est la suivante : une requête en échec fait perdre du temps à un utilisateur Locust, mais elle n'est comptée ni dans le débit ni dans la latence moyenne, qui ne gardent que les réponses 200. Donc C ÷ débit devient trop grand. Ce n'est pas la saturation qui crée l'écart, car les runs saturés sans échec n'en ont presque pas. <!-- À compléter après la vérification : durée mesurée des requêtes en échec (commande sur raw/p2_N*_C16.csv) -->
+- Ces échecs sont des erreurs de résolution de nom (`gaierror` dans la colonne `ERROR`) : le client n'a pas réussi à trouver l'adresse de l'application, donc la requête n'a probablement jamais atteint le serveur. À C = 16, chaque requête en échec a duré 10, 15 ou 20 secondes (des multiples de 5 secondes). Pendant ce temps, l'utilisateur Locust ne reçoit aucune réponse : son temps est perdu, mais il n'est compté ni dans le débit ni dans la latence moyenne, qui ne gardent que les réponses 200. Donc C ÷ débit devient trop grand. Ce n'est pas la saturation qui crée l'écart, car les runs saturés sans échec n'en ont presque pas.
 
 ---
 
@@ -283,10 +336,12 @@ Le résumé de tous les runs est dans `figures/resume_p2.csv`, et la capacité d
 - Chaque couple (N, C) n'a été mesuré qu'une fois.
 - N = 1 a été mesuré en deux sessions. La version `fixed1b` a été arrêtée puis redémarrée entre les runs C = 2, 4, 8 et les runs C = 1, 16, 32, 64. Cela peut expliquer en partie les débits plus bas à C = 4 et 8, mais je ne l'ai pas démontré.
 - Pour N = 4 et C = 2, le journal contient 6 identifiants d'instance au lieu de 4. La liste des instances relevée avant et après la campagne montre que deux instances ont été remplacées par App Engine pendant la campagne. Je n'ai pas identifié la cause. Ce run ne contient aucune requête en échec et son débit est cohérent avec celui de N = 2 à la même concurrence.
-- Les requêtes en échec (code HTTP 0) vont de 0 à 9 par run, soit moins de 0,5 % des requêtes. Elles apparaissent à partir de C = 8 (une seule pour N = 4 à C = 4).
+- Les requêtes en échec (code HTTP 0) vont de 0 à 9 par run, soit moins de 0,5 % des requêtes. Elles apparaissent à partir de C = 8 (une seule pour N = 4 à C = 4). Ce sont des erreurs de résolution de nom côté client.
 - Le sujet limite C à 64 et N à 4. Le débit maximal de N = 4 n'est donc peut-être pas atteint.
-- 
-### Partie 3 : corriger et re-mesurer
+
+---
+
+### 2.3 Partie 3 : corriger et re-mesurer
 
 **Goulot choisi.** Le passage de `get_timeline` à la méthode boucle quand F ≥ 30. En partie 1, le temps serveur saute de 27 ms (F = 25) à 421 ms (F = 30), puis monte jusqu'à 1 319 ms (F = 100). Une timeline lit aussi beaucoup plus d'entités : 2 021 à F = 100, contre 21 pour F ≤ 29.
 
@@ -302,7 +357,7 @@ Le résumé de tous les runs est dans `figures/resume_p2.csv`, et la capacité d
 - Moins d'entités lues : 1 + 20 × (nombre de requêtes), car chaque requête renvoie au plus 20 posts.
 
 **Ce que ça coûte.**
-- **Complexité :** quelques lignes en plus (le découpage en groupes et le tri en Python).
+- **Complexité :** quelques lignes en plus (le découpage en groupes et le tri en Python). Le code est un peu plus long à lire.
 - **Les requêtes restent envoyées l'une après l'autre.** Le temps continue donc d'augmenter avec F, par paliers. La correction ne rend pas la timeline indépendante de F.
 - **Cohérence des données :** on fait plusieurs requêtes à des instants légèrement différents, donc un post écrit entre deux requêtes peut apparaître ou non. La boucle actuelle avait déjà ce défaut. Ce n'est pas aussi cohérent qu'une seule requête, mais je ne change aucune donnée.
 - **Erreurs :** ma version supprime le `try / except` silencieux. Si une requête échoue, on aura une vraie erreur et plus un ralentissement caché.
@@ -344,7 +399,7 @@ Les entités lues et le coût de 1 million de timelines (valeurs déduites du co
 - je retire les 5 premières secondes de chaque run et je ne garde que les réponses 200 ;
 - pour chaque run, je calcule la médiane du temps serveur (`Server-Timing`) et la médiane de la latence client.
 
-Les 20 runs ont été servis par une seule instance et ne contiennent que des réponses 200. Date : <!-- À compléter : date et heures (campagne de 10h19 à 10h40) -->.
+Les 20 runs ont été servis par une seule instance et ne contiennent que des réponses 200. Date : le 19 novembre 2026, de 10h19 à 10h40 (heures en UTC).
 
 **Un incident.** Ma première tentative a échoué : tous les runs ont renvoyé 0 requête. Le script bloquait Locust à son démarrage (une erreur de ma commande de délai maximal, qui lui retirait l'accès au terminal). J'ai corrigé le script et j'ai refait toute la campagne. Les journaux des tentatives ratées ne sont pas utilisés.
 
@@ -393,7 +448,7 @@ Le gain le plus grand est de × 18,1, à F = 95. À F = 100, l'application sert 
 - **Argent :** la correction ne coûte rien de plus à faire tourner. Elle fait baisser le nombre de lectures Datastore, donc la facture, dès que F dépasse 29. Elle ne change rien pour F ≤ 29.
 - **Cohérence des données :** je ne change aucune donnée. Mais on fait plusieurs requêtes à des instants légèrement différents, donc un post écrit entre deux requêtes peut apparaître ou non dans la timeline. L'ancienne boucle avait déjà ce défaut, mais ce n'est pas aussi cohérent qu'une seule requête.
 - **Erreurs :** j'ai supprimé le `try / except` silencieux. Si Datastore refuse une requête, on le verra maintenant au lieu d'avoir un ralentissement caché.
-- **Vérification des résultats :** <!-- À compléter : résultat de la comparaison des timelines de l'ancienne et de la nouvelle version (f05, f20, f30, f100), affichée au début de la campagne -->
+- **Vérification des résultats :** j'ai comparé les timelines de l'ancienne version (la version par défaut) et de la nouvelle pour `f05_u00001`, `f20_u00001`, `f30_u00001` et `f100_u00001`. Pour ces quatre utilisateurs, les 20 posts sont les mêmes, dans le même ordre.
 
 **Ce que la correction ne règle pas.** Les requêtes restent envoyées l'une après l'autre. Le temps continue donc d'augmenter avec F, par paliers : il est de 46 ms à F = 30 et de 91 ms à F = 100. Pour aller plus loin, on pourrait envoyer les requêtes en parallèle, ou calculer la timeline de chaque utilisateur à l'écriture d'un post. Je n'ai testé aucune de ces deux idées.
 
@@ -401,6 +456,17 @@ Le gain le plus grand est de × 18,1, à F = 95. À F = 100, l'application sert 
 - Chaque jeu n'est mesuré qu'une seule fois, avant comme après.
 - Les mesures d'avant (partie 1) et d'après (partie 3) n'ont pas été faites le même jour, ce qui peut expliquer les 2 à 5 ms d'écart à F ≤ 25.
 - Les entités lues et les coûts sont déduits du code, pas mesurés dans la facturation.
+
+---
+
+## 3. Tableau des verdicts
+
+| Dimension | Passe à l'échelle ? | Jusqu'où ? | Pourquoi (mécanisme) | Preuve |
+|---|---|---|---|---|
+| Utilisateurs (U) | Oui | Jusqu'à 10 000 utilisateurs (valeur testée) | Une timeline lit seulement l'entité `User` demandée et 20 posts, quelle que soit la taille de la base. Le temps serveur passe de 22,8 ms (U = 100) à 26,0 ms (U = 10 000). | Fig. 1a |
+| Posts par utilisateur (P) | Oui, presque | Jusqu'à 1 000 posts par utilisateur (valeur testée) | La requête s'arrête à 20 posts (`limit=20`). Le temps passe de 23,5 ms (P = 10) à 29,1 ms (P = 1 000), soit 24 % de plus pour 100 fois plus de posts. L'index `(author, created desc)` l'explique probablement, mais je ne l'ai pas mesuré. | Fig. 1a |
+| Followees (F) | Non | Version d'origine : jusqu'à F = 29. Après correction : le temps reste sous 100 ms jusqu'à F = 100, mais il augmente toujours avec F | `IN` accepte au plus 30 valeurs. À partir de F = 30, le code passe en silence à une requête par auteur, envoyées l'une après l'autre (421 ms à F = 30, 1 319 ms à F = 100). Ma correction envoie les auteurs par groupes de 30 : 4 requêtes au lieu de 101 à F = 100 (91 ms). Le temps monte encore par paliers, une marche tous les 30 comptes suivis. | Fig. 1b et Fig. 3 |
+| Instances (N) | Oui | Jusqu'à 4 instances (limite du sujet) | Chaque instance traite ses requêtes seule. Le débit maximal est multiplié par 1,9 avec 2 instances et par 3,8 avec 4. Une instance ne sert qu'environ 28 timelines par seconde, car son worker `gunicorn` traite une requête à la fois et attend Datastore. | Fig. 2a (et Fig. 2b) |
 
 ## Conclusion : TinyInsta passe-t-elle à l'échelle ?
 
@@ -424,4 +490,112 @@ Le sujet donne deux sens à « passer à l'échelle » : quand un paramètre des
 
 **En résumé.** Les données de taille (U et P) et les instances passent à l'échelle. Le nombre de comptes suivis (F) est le point faible, parce que le coût d'une timeline dépend du nombre de requêtes envoyées à Datastore, et que ce nombre augmente avec F. Ma correction le réduit beaucoup, sans le supprimer. Pour aller plus loin, il faudrait envoyer ces requêtes en parallèle, ou calculer la timeline de chaque utilisateur à l'écriture d'un post. Je n'ai testé aucune de ces deux idées.
 
+---
+
+## 4. Validité
+
+**Question 1 : combien d'instances ont réellement servi chacune de mes mesures ? Est-ce celles que j'attendais ?**
+
+**Réponse.** Oui. Chaque run a été servi par le nombre d'instances attendu : 1 pour les parties 1 et 3, et N pour la partie 2. Il y a une seule exception : N = 4 avec C = 2, où le journal contient 6 identifiants.
+
+**Justification.**
+- Je compte les instances avec la colonne `INSTANCE` de chaque journal (en-tête `X-Instance`). Les requêtes en échec n'ont pas d'identifiant, donc je ne les compte pas.
+- Pour la partie 1, les 26 runs ont été servis par 1 instance. Pour la partie 3, les 20 runs aussi. Pour la partie 2, les runs de N = 1 et N = 2 ont été servis par 1 et 2 instances.
+- Avant chaque campagne de la partie 2, le script vérifie que la version est `SERVING` avec N instances listées par `gcloud`. J'ai gardé la liste avant et après dans `raw/p2_N<N>_instances_avant.txt` et `_apres.txt`.
+- Pour N = 4 et C = 2, la liste avant et après montre que deux instances ont été remplacées par App Engine pendant la campagne. Je n'ai pas trouvé la cause. Ce run n'a aucune requête en échec et son débit est cohérent avec celui de N = 2, donc je l'ai gardé.
+
+---
+
+**Question 2 : mes runs sont-ils indépendants ? L'ordre des mesures influence-t-il les résultats ?**
+
+**Réponse.** Pas totalement. Mes runs sont enchaînés sur la même instance, sans la redémarrer entre deux runs. Je n'ai pas mesuré l'effet de l'ordre.
+
+**Justification.**
+- J'ai mélangé l'ordre des runs avec une graine fixe (`raw/order.txt`, `raw/p2_N<N>_order.txt`, `raw/p3_order.txt`). Cela évite qu'un facteur soit toujours mesuré avant ou après un autre, mais ne prouve pas que l'ordre n'a pas d'effet.
+- Pour N = 1, la mesure a été faite en deux sessions. La version a été arrêtée puis redémarrée entre les runs C = 2, 4, 8 et les runs C = 1, 16, 32, 64. Le débit à C = 4 et C = 8 est d'environ 24 requêtes par seconde, contre 28 à 29 à C = 16, 32 et 64. Cet écart de 15 % pour un même N montre qu'il existe du bruit entre runs.
+- Chaque point n'est mesuré qu'une seule fois, donc je ne connais pas la variation d'un même run refait.
+- Les mesures d'avant la correction (partie 1) et d'après (partie 3) n'ont pas été faites le même jour. Pour F ≤ 25, la version corrigée est un peu plus lente (2 à 5 ms), et la partie de la latence hors de `get_timeline` passe de 23 à 28 ms environ. Je pense à une différence entre sessions, mais je ne l'ai pas démontré.
+
+---
+
+**Question 3 : quelle part de la latence est due au réseau ?**
+
+**Réponse.** La différence entre la latence client et le temps serveur est d'environ 23 ms en partie 1 et d'environ 28 ms en partie 3, quel que soit F. C'est un maximum pour la part du réseau.
+
+**Justification.**
+- Cette différence ne change pas quand le temps serveur augmente, donc elle ne dépend pas du travail dans Datastore.
+- Elle contient le réseau, mais aussi la préparation du JSON et le passage par le serveur web d'App Engine. La vraie part du réseau est donc plus petite, je ne l'ai pas séparée.
+- Le client est en Belgique et l'application à Zurich, ce qui explique sans doute une partie de ces millisecondes.
+- La part en pourcentage dépend de F : environ 49 % de la latence à F = 5, mais seulement 1,7 % à F = 100 dans la version d'origine.
+
+---
+
+**Question 4 : qu'ai-je compté comme un échec ? Quels codes HTTP ai-je observés ?**
+
+**Réponse.** J'ai compté comme échec toute requête qui n'a pas reçu de réponse HTTP (code 0 dans mes journaux). J'ai observé seulement deux codes : 200 et 0. Je n'ai vu aucune erreur 5xx.
+
+**Justification.**
+- Les parties 1 et 3 ne contiennent que des réponses 200.
+- En partie 2, les échecs (code 0) vont de 0 à 9 par run, soit moins de 0,5 % des requêtes. Il n'y en a pas pour C ≤ 4, sauf une pour N = 4 et C = 4. Ils apparaissent surtout à partir de C = 8 ou 16.
+- Je retire les échecs des médianes et du débit, qui ne gardent que les réponses 200. C'est ce qui creuse l'écart entre la loi de Little et la latence moyenne dans les runs avec beaucoup d'échecs.
+- Tous les échecs que j'ai regardés (C = 16, pour N = 1, 2 et 4) sont des erreurs `gaierror` : le client n'a pas pu résoudre le nom de l'application. Ils ont duré 10, 15 ou 20 secondes, des multiples de 5 secondes. Ils viennent donc probablement du client (Cloud Shell) et pas de l'application, mais je ne l'ai pas démontré. Ils montrent aussi que le client de charge a une limite, alors que le sujet demande de supposer qu'il n'est pas un goulot.
+
+---
+
+**Question 5 : ai-je vérifié que ma mesure exerce bien le chemin de code que je crois ?**
+
+**Réponse.** Oui pour le chemin IN contre boucle. J'ai une réserve : en partie 1 et en partie 3, chaque run interroge toujours le même utilisateur TinyInsta.
+
+**Justification.**
+- Un test direct sur Datastore accepte un `IN` de 30 valeurs et refuse 31 (« IN supports up to 30 values »). Le seuil correspond au saut du temps serveur entre F = 25 et F = 30.
+- `client.gql` n'existe pas dans la bibliothèque installée : la version GQL du code ne s'exécute donc jamais.
+- Avant chaque run, le script vérifie que la timeline de `<jeu>_u00001` renvoie 20 posts.
+- Pour la partie 2, F vaut 20, donc `get_timeline` utilise toujours la méthode IN, qui n'est pas concernée par le seuil.
+- Pour la partie 3, j'ai comparé les timelines de l'ancienne et de la nouvelle version pour `f05_u00001`, `f20_u00001`, `f30_u00001` et `f100_u00001` : elles sont identiques, avec les mêmes 20 posts dans le même ordre.
+- **Ma réserve :** dans `bench/locustfile.py`, chaque utilisateur Locust reçoit un utilisateur TinyInsta dans l'ordre (`<jeu>_u00000`, puis `_u00001`, etc.). Avec un seul utilisateur Locust (`-u 1`), chaque run des parties 1 et 3 mesure donc toujours `<jeu>_u00000`, environ mille fois. Le mécanisme étudié (le nombre de requêtes selon F) ne dépend pas de l'utilisateur, mais mes courbes décrivent un seul utilisateur par jeu. En partie 2, avec C utilisateurs Locust, les C premiers utilisateurs du jeu `base` sont interrogés. Je n'ai pas vérifié que `_u00000` renvoie bien 20 posts dans chaque jeu. <!-- À compléter : résultat de la vérification des timelines de <jeu>_u00000 -->
+
+---
+
+**Question 6 : combien ma campagne a-t-elle coûté (lectures, écritures, heures d'instance) ?**
+
+**Réponse.** Voir la section 5 : <!-- À compléter : une phrase avec le coût total, après avoir rempli la section 5 -->
+
+---
+
+## 5. Coût de la campagne
+
+**Budget.** J'ai créé une alerte budgétaire à 20 $ dans Facturation, Budgets et alertes.
+
+**Estimation à partir de mes journaux.** Avec `python3 scripts/cout_estime.py`, j'estime les lectures et les écritures Datastore à partir des journaux bruts. Les hypothèses sont écrites en tête du script : les entités lues par timeline sont déduites du code (21 pour une requête IN, 1 + 20 × (F + 1) pour l'ancienne boucle, 1 + 20 × le nombre de groupes pour la version corrigée), les échauffements et les runs de test ne sont pas comptés, et les quotas gratuits ne sont pas déduits. Les prix sont ceux de Zurich : 0,042 $ pour 100 000 lectures et 0,126 $ pour 100 000 écritures.
+
+<!-- À compléter : tableau avec les résultats du script (lectures par partie, écritures de la génération des 26 jeux, coût estimé) -->
+
+**Facturation réelle.** Relevé sur la page Facturation, Rapports (du 30/10/2026 à <!-- date du relevé -->), regroupé par SKU :
+
+| Poste | Quantité | Coût |
+|---|---|---|
+| Lectures d'entités Datastore | <!-- --> | <!-- --> |
+| Écritures d'entités Datastore | <!-- --> | <!-- --> |
+| Heures d'instance App Engine (B1) | <!-- --> | <!-- --> |
+| Heures d'instance App Engine (F1) | <!-- --> | <!-- --> |
+| **Total** | | <!-- --> |
+
+<!-- À compléter : crédits appliqués, et comparaison avec l'estimation du sujet (moins de 1 $ pour les données, 2 à 5 $ pour les mesures) et avec l'alerte de 20 $ -->
+
+**Version arrêtée après chaque campagne.** Chaque version `fixedN` et `fixchunk` a été arrêtée dès la fin de ses mesures. `fixed1` est restée bloquée plusieurs jours par une opération App Engine en attente, mais elle était arrêtée et n'a pas été facturée. <!-- À vérifier dans la facturation -->
+
+---
+
+## Organisation du dépôt
+
+| Élément | Contenu |
+|---|---|
+| `README.md` | Ce rapport |
+| `raw/` | Tous les journaux bruts produits par `bench/locustfile.py` (parties 1, 2 et 3), les listes d'instances et les ordres des runs |
+| `figures/` | Les figures (PNG) et les valeurs tracées (CSV avec unités dans les noms de colonnes) : `fig1a`, `fig1b`, `fig2a`, `fig2b`, `fig3`, plus les résumés `resume_p1.csv`, `resume_p2.csv`, `capacite_p2.csv`, `fig3_cout.csv` |
+| `scripts/` | Les scripts de mesure (`campagne_p1.sh`, `campagne_p2.sh`, `campagne_p3.sh`), d'analyse (`analyse_p1.py`, `analyse_p2.py`, `analyse_p3.py`), le correctif de la partie 3 (`appliquer_correctif_p3.py`) et l'estimation du coût (`cout_estime.py`) |
+| `main.py`, `app.yaml`, `deploy_fixed.sh`, `index.yaml`, `bench/` | Fournis par l'énoncé. `main.py` contient la correction de la partie 3 |
+| `SUJET.md` | L'énoncé |
+
+**Régénérer toutes les figures avec une seule commande :** `bash scripts/regenerer_figures.sh`.
 
