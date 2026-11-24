@@ -1,16 +1,13 @@
-#!/bin/bash
 cd ~/tinyinsta-2026 || exit 1
 URL=$(gcloud app versions describe fixed1 --service default --format='value(versionUrl)')
 mkdir -p raw
 
-# jeu:nombre_d_utilisateurs
 RUNS="u100:100 base:1000 u10000:10000 p10:100 p100:100 p1000:100"
 for f in $(seq 5 5 100); do RUNS="$RUNS $(printf 'f%02d' $f):120"; done
 
 ORDER=$(echo $RUNS | tr ' ' '\n' | shuf --random-source=<(yes 2026))
 echo "$ORDER" > raw/order.txt
 
-# échauffement de l'instance (non conservé dans raw/)
 TINY_PREFIX=base TINY_USERS=1000 TINY_LOG=/tmp/warmup.csv \
   python -m locust -f bench/locustfile.py --headless -u 1 -r 1 -t 20s --only-summary --host $URL > /dev/null 2>&1
 
