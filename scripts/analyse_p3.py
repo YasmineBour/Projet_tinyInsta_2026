@@ -10,8 +10,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-WARMUP_S = 5                  # meme traitement que la partie 1
-PRIX_LECTURE_MILLION = 0.42   # 0,042 $ / 100 000 lectures a Zurich -> 0,42 $ par "lecture par timeline" pour 1 million de timelines
+WARMUP_S = 5                  
+PRIX_LECTURE_MILLION = 0.42  
 os.makedirs("figures", exist_ok=True)
 
 
@@ -25,11 +25,11 @@ def stats(path):
                 instances=d.INSTANCE.nunique(), codes=str(d.STATUS.value_counts().to_dict()))
 
 
-def lectures_avant(F):    # d'apres le code : IN si F + 1 <= 30 auteurs, sinon une requete par auteur (P = 20)
+def lectures_avant(F):   
     return 21 if F + 1 <= 30 else 1 + 20 * (F + 1)
 
 
-def lectures_apres(F):    # un IN par groupe de 30 auteurs au plus
+def lectures_apres(F):   
     return 1 + 20 * math.ceil((F + 1) / 30)
 
 
