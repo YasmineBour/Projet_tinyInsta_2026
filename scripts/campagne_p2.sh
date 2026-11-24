@@ -1,20 +1,3 @@
-#!/bin/bash
-# Partie 2 : capacité.
-# Usage : bash scripts/campagne_p2.sh N      (N = 1, 2 ou 4)
-#   Variante : SUFFIX=b bash scripts/campagne_p2.sh 1   (déploie sous le nom fixed1b si fixed1 est bloquée)
-#
-# Ce script, pour UNE version fixedN :
-#   1. déploie la version (./deploy_fixed.sh N) et attend que N instances existent ;
-#   2. vérifie que le jeu "base" répond (20 posts) et que les en-têtes X-Instance / Server-Timing sont là ;
-#   3. échauffe toutes les instances (non conservé) ;
-#   4. mesure C = 1, 2, 4, 8, 16, 32, 64 utilisateurs Locust, dans un ordre mélangé (graine fixe) ;
-#   5. ARRÊTE la version à la fin (même en cas d'erreur ou de Ctrl+C), pour ne plus être facturée.
-#
-# Sorties : raw/p2_N<N>_C<C>.csv (un journal brut par run), raw/p2_N<N>_order.txt,
-#           raw/p2_N<N>_instances_avant.txt et raw/p2_N<N>_instances_apres.txt.
-#   Reprise : SKIP_DEPLOY=1 SUFFIX=b bash scripts/campagne_p2.sh 1   (redémarre la version existante sans la redéployer ;
-#             les runs déjà faits sont sautés)
-# Pour garder la version allumée à la fin (déconseillé) : KEEP=1 bash scripts/campagne_p2.sh N
 
 set -u
 N=${1:?"Usage : bash scripts/campagne_p2.sh N   (N = 1, 2 ou 4)"}
@@ -23,11 +6,11 @@ case $N in
   *) echo "N doit valoir 1, 2 ou 4"; exit 1 ;;
 esac
 
-cd "$(dirname "$0")/.." || exit 1      # racine du dépôt
+cd "$(dirname "$0")/.." || exit 1      
 SUFFIX=${SUFFIX:-}                     # ex. SUFFIX=b pour déployer sous le nom fixed1b
 VERSION=fixed${N}${SUFFIX}
 YAML="app-fixed-${N}${SUFFIX}.yaml"
-DUREE=60                               # secondes par run
+DUREE=60                              
 mkdir -p raw
 
 stop_version() {
@@ -42,9 +25,7 @@ stop_version() {
 }
 trap stop_version EXIT
 
-# ---------- 1. Déploiement ----------
-# Sans SUFFIX : on utilise le script fourni (./deploy_fixed.sh), qui crée la version fixedN.
-# Avec SUFFIX : même configuration (B1, manual scaling, gunicorn identique), mais sous un autre nom.
+
 deploy_version() {
   if [ -z "$SUFFIX" ]; then timeout 600 ./deploy_fixed.sh "$N"; return; fi
   cat > "$YAML" <<EOF2
@@ -82,12 +63,10 @@ fi
 URL=$(gcloud app versions describe "$VERSION" --service default --format='value(versionUrl)')
 echo "URL : $URL"
 
-# Une version déjà arrêtée (cas d'un redéploiement) peut rester arrêtée : on la démarre explicitement.
 echo "=== Démarrage de $VERSION (sans effet si elle tourne déjà)"
 timeout 300 gcloud app versions start "$VERSION" --service default --quiet \
   || echo "(démarrage : erreur ou déjà démarrée, on vérifie ci-dessous)"
 
-# attendre que l'état soit SERVING et que le nombre d'instances listées soit N
 OK=0
 for i in $(seq 1 12); do
   ST=$(timeout 60 gcloud app versions describe "$VERSION" --service default --format='value(servingStatus)' 2>/dev/null)
