@@ -1,17 +1,4 @@
-#!/usr/bin/env python3
-"""Estime les lectures et les ecritures Datastore de la campagne a partir des journaux bruts.
-Usage (racine du depot) : python3 scripts/cout_estime.py   ->   ecrit aussi figures/cout_estime.csv
 
-HYPOTHESES (a recopier dans le README) :
- - Chaque requete HTTP 200 d'une timeline lit 21 entites si F + 1 <= 30 (1 User + 20 Post, methode IN),
-   1 + 20 * (F + 1) entites avec l'ancienne boucle (F >= 30, P = 20), et 1 + 20 * ceil((F + 1) / 30)
-   avec la version corrigee. Valeurs DEDUITES DU CODE, pas mesurees.
- - Les echauffements, les runs de test et les tentatives ratees ne sont pas comptes : les lectures reelles
-   sont donc un peu plus elevees.
- - Ecritures : chaque entite User et Post des 26 jeux est ecrite une fois (seeds uniques).
- - Les quotas gratuits (50 000 lectures et 20 000 ecritures par jour) ne sont pas deduits.
- - Prix de Zurich (europe-west6), mode Datastore : 0,042 $ / 100 000 lectures, 0,126 $ / 100 000 ecritures.
-"""
 import glob
 import math
 import os
