@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 """Partie 1 : lit raw/<jeu>.csv, ecrit figures/fig1a.csv, fig1b.csv, resume_p1.csv et les PNG."""
 import os
 import pandas as pd
@@ -6,10 +6,9 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-WARMUP_S = 5  # secondes ecartees au debut de chaque run (demarrage a froid)
+WARMUP_S = 5  
 os.makedirs("figures", exist_ok=True)
 
-# jeu -> (facteur, valeur du facteur, U, P, F)
 JEUX = {
     "u100":   ("U", 100,   100,   20,   20),
     "base":   ("U", 1000,  1000,  20,   20),
@@ -20,7 +19,6 @@ JEUX = {
 }
 for f in range(5, 105, 5):
     JEUX[f"f{f:02d}"] = ("F", f, 120, 20, f)
-# u100 sert aussi de point P = 20 (U = 100, F = 20)
 P_REF = ("u100", 20)
 
 rows = {}
