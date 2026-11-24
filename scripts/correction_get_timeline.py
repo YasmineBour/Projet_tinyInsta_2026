@@ -1,9 +1,4 @@
-#!/usr/bin/env python3
-"""Partie 3 : remplace get_timeline dans main.py par la version corrigee
-(requetes IN par groupes de 30 auteurs au plus, au lieu d'une requete par auteur).
-Usage (racine du depot) : python3 scripts/appliquer_correctif_p3.py
-Le script affiche les differences. Pour annuler : git checkout main.py
-"""
+
 import difflib
 import sys
 
@@ -19,7 +14,7 @@ def _groupes(liste, taille):
 
 
 def get_timeline(user: str, limit: int = 20):
-    """Retourne la liste des posts (entites) pour la timeline d'un utilisateur.
+    """Retourne la liste des posts pour la timeline d'un utilisateur.
 
     Correction (partie 3) : les auteurs sont envoyes a Datastore par groupes de
     30 au plus (une requete IN par groupe), au lieu d'une requete par auteur
