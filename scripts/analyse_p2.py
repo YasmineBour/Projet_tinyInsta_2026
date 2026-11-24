@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Partie 2 : lit raw/p2_N<N>_C<C>.csv et ecrit
    figures/fig2a.csv/.png, figures/fig2b.csv/.png, figures/resume_p2.csv, figures/capacite_p2.csv.
    Une seule commande : python3 scripts/analyse_p2.py
@@ -11,9 +10,9 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-WARMUP_S = 5                 # secondes ecartees au debut de chaque run
-SEUIL_SATURATION = 0.90      # saturation : premier C qui atteint 90 % du debit maximal
-HYP_DEBIT_PAR_INSTANCE = 40  # hypothese ecrite avant les mesures (req/s par instance)
+WARMUP_S = 5                
+SEUIL_SATURATION = 0.90      
+HYP_DEBIT_PAR_INSTANCE = 40  
 
 os.makedirs("figures", exist_ok=True)
 rows = []
@@ -29,7 +28,7 @@ for path in sorted(glob.glob("raw/p2_N*_C*.csv")):
         continue
     fin = (ok.T_START + ok.LATENCY_MS / 1000).max()
     debut = ok.T_START.min()
-    debit = len(ok) / (fin - debut)                     # requetes servies par seconde
+    debit = len(ok) / (fin - debut)                     #requetes servies par seconde
     par_instance = ok.INSTANCE.value_counts(normalize=True)
     rows.append(dict(
         N_instances=N, C_utilisateurs_locust=C,
