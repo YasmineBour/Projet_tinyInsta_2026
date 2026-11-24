@@ -1,23 +1,10 @@
-#!/bin/bash
-# Partie 3 : mesure de la version corrigée de get_timeline (requêtes IN par groupes de 30 auteurs).
-# Usage : bash scripts/campagne_p3.sh
-#
-# MÊME PROTOCOLE que la partie 1 (Fig. 1b) : une version à 1 instance fixe (B1, manual scaling,
-# même configuration que fixed1), Locust avec 1 utilisateur (-u 1), 60 s par run, les 20 jeux
-# f05 ... f100 (U = 120, P = 20) dans un ordre mélangé, 5 premières secondes écartées à l'analyse.
-# Seul le code de get_timeline change. La version est déployée avec --no-promote.
-#
-# Sorties : raw/p3_<jeu>.csv, raw/p3_order.txt, raw/p3_<jeu>_locust.txt, raw/p3_instances_*.txt.
-# La version est ARRÊTÉE à la fin (même après une erreur). Variantes :
-#   SKIP_DEPLOY=1 bash scripts/campagne_p3.sh   : redémarre la version existante sans la redéployer
-#   VERSION=autrenom bash scripts/campagne_p3.sh : change le nom de la version (défaut : fixchunk)
-#   KEEP=1 ...                                   : ne pas arrêter la version à la fin (déconseillé)
+
 
 set -u
 cd "$(dirname "$0")/.." || exit 1
 VERSION=${VERSION:-fixchunk}
 YAML="app-${VERSION}.yaml"
-APP=https://tinyinsta-510215.oa.r.appspot.com      # version par défaut (ancien code), pour comparer les résultats
+APP=https://tinyinsta-510215.oa.r.appspot.com     
 DUREE=60
 mkdir -p raw
 
@@ -33,13 +20,13 @@ stop_version() {
 }
 trap stop_version EXIT
 
-# Le correctif doit être dans main.py avant le déploiement
+
 if [ "${SKIP_DEPLOY:-0}" != "1" ] && ! grep -q "MAX_IN" main.py; then
   echo "ERREUR : main.py ne contient pas le correctif. Lance d'abord : python3 scripts/appliquer_correctif_p3.py"
   exit 1
 fi
 
-# ---------- 1. Déploiement (même configuration que fixed1) ----------
+# ---------- 1. Déploiement ----------
 deploy_version() {
   cat > "$YAML" <<EOF2
 runtime: python312
@@ -91,12 +78,12 @@ echo "=== Les timelines de la version corrigée sont-elles identiques à celles 
 python3 scripts/comparer_timelines.py "$APP" "$URL" f05_u00001 f20_u00001 f30_u00001 f100_u00001 \
   || echo "ATTENTION : des différences existent (voir ci-dessus). On continue les mesures, mais il faudra les expliquer."
 
-# ---------- 3. Échauffement (comme en partie 1 : 20 s sur base, non conservé) ----------
+# ---------- 3. Échauffement----------
 echo "=== Échauffement  $(date +%T)"
 TINY_PREFIX=base TINY_USERS=1000 TINY_LOG=/tmp/warmup_p3.csv \
   python -m locust -f bench/locustfile.py --headless -u 1 -r 1 -t 20s --only-summary --host "$URL" > /dev/null 2>&1
 
-# ---------- 4. Mesures : les 20 jeux f05 ... f100, ordre mélangé ----------
+# ---------- 4. Mesures----------
 JEUX=""
 for f in $(seq 5 5 100); do JEUX="$JEUX $(printf 'f%02d' $f)"; done
 ORDER=$(echo $JEUX | tr ' ' '\n' | shuf --random-source=<(yes 2026))
