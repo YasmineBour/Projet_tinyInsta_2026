@@ -1,7 +1,5 @@
-#!/usr/bin/env python3
-"""Compare les timelines renvoyees par deux versions de l'application.
-Usage : python3 scripts/comparer_timelines.py URL_A URL_B utilisateur1 [utilisateur2 ...]
-"""
+
+
 import json
 import sys
 import urllib.request
