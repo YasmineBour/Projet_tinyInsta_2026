@@ -19,8 +19,6 @@ Mon travail a trois parties. Dans la partie 1, je mesure ce que coûte une timel
 
 **Ce que je trouve, en résumé.** TinyInsta passe à l'échelle sur U, sur P et sur N. Elle ne passe pas à l'échelle sur F : à partir de 30 comptes suivis, le temps d'une timeline est multiplié par 16 parce que le code change de méthode sans prévenir. Ma correction rend le temps 9 à 18 fois plus court pour F ≥ 30, mais il continue d'augmenter avec F. La conclusion en section 3 détaille tout cela.
 
-**Plan.** 1. Montage ; 2. Résultats des trois parties ; 3. Tableau des verdicts et conclusion ; 4. Validité ; 5. Coût de la campagne ; puis l'organisation du dépôt.
-
 ---
 
 ## 1. Montage
