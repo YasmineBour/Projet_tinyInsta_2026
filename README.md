@@ -1,7 +1,7 @@
 # TinyInsta passe-t-elle à l'échelle ?
 
 Projet Données Massives et Cloud – Benchmark, édition 2026  
-Yasmine BOUR – rendu individuel – novembre 2026
+Yasmine BOUR – novembre 2026
 
 - Application déployée (version par défaut) : https://tinyinsta-510215.oa.r.appspot.com
 - Dépôt : https://github.com/YasmineBour/Projet_tinyInsta_2026
