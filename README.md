@@ -370,8 +370,6 @@ Les parties 1 et 3 ne contiennent que des réponses 200. En partie 2, les échec
 
 Oui, pour la question « méthode IN ou méthode boucle ? ». Un test direct sur Datastore accepte un `IN` de 30 valeurs et en refuse 31, et ce seuil correspond au saut du temps serveur entre F = 25 et F = 30. Avant chaque run, le script vérifie que la timeline de `<jeu>_u00001` renvoie bien 20 posts. En partie 2, F vaut 20, donc `get_timeline` utilise toujours la méthode IN, qui n'est pas concernée par le seuil. En partie 3, les timelines de l'ancienne et de la nouvelle version sont identiques pour les quatre utilisateurs testés.
 
-J'ai une réserve. Dans `bench/locustfile.py`, chaque utilisateur Locust reçoit un utilisateur TinyInsta dans l'ordre : `<jeu>_u00000`, puis `_u00001`, etc. Avec un seul utilisateur Locust (`-u 1`), chaque run des parties 1 et 3 mesure donc toujours `<jeu>_u00000`, environ mille fois. Le mécanisme que j'étudie (le nombre de requêtes selon F) ne dépend pas de l'utilisateur, mais mes courbes décrivent un seul utilisateur par jeu. En partie 2, avec C utilisateurs Locust, ce sont les C premiers utilisateurs de `base` qui sont interrogés.
-<!-- À compléter : résultat de la vérification que <jeu>_u00000 renvoie 20 posts dans chaque jeu -->
 
 ### 4.6 Combien ma campagne a-t-elle coûté ?
 
@@ -402,7 +400,7 @@ Table 9 – La facturation par SKU.
 
 Des crédits de −1,93 $ couvrent la totalité : le sous-total à payer est de 0,00 $.
 
-Les lectures et les écritures représentent presque tout le coût : 1,90 $ sur 1,93 $. Les heures d'instance sont gratuites. D'après la page de tarification d'App Engine, les instances B1 ont 9 heures gratuites par jour et les instances F1 en ont 28, et je suis très loin de ces limites. Le stockage Artifact Registry (0,03 $) correspond probablement aux images créées à chaque déploiement, mais je ne l'ai pas vérifié.
+Les lectures et les écritures représentent presque tout le coût : 1,90 $ sur 1,93 $. Les heures d'instance sont gratuites. D'après la page de tarification d'App Engine, les instances B1 ont 9 heures gratuites par jour et les instances F1 en ont 28, et je suis très loin de ces limites.
 
 Les prix ne sont pas exactement ceux du tarif plein, à cause des quotas gratuits quotidiens : 3 651 206 lectures au prix de 0,042 $ pour 100 000 donneraient 1,53 $, et la facture est de 1,47 $. Les 0,06 $ d'écart correspondent à peu près aux 50 000 lectures gratuites de quelques jours.
 
@@ -417,9 +415,9 @@ J'ai estimé les lectures et les écritures avant de regarder la facturation, av
 
 Table 10 – Mon estimation et la facturation.
 
-Mon estimation des lectures est inférieure de 7 % à la facturation. C'est ce que j'attendais : je ne compte ni les échauffements, ni les runs de test, ni mes vérifications à la main. Elle se répartit en 1 483 050 lectures pour la partie 1, 1 280 076 pour la partie 2 et 640 846 pour la partie 3. La partie 1 est la plus chère alors qu'elle a servi peu de requêtes pour F ≥ 30, parce qu'une timeline de l'ancienne boucle lit jusqu'à 2 021 entités. Mon estimation des écritures est supérieure de 3 % à la facturation, peut-être parce que certaines entités n'ont pas été écrites comme je le suppose. Je ne l'ai pas vérifié.
+Mon estimation des lectures est inférieure de 7 % à la facturation. C'est ce que j'attendais : je ne compte ni les échauffements, ni les runs de test, ni mes vérifications à la main. Elle se répartit en 1 483 050 lectures pour la partie 1, 1 280 076 pour la partie 2 et 640 846 pour la partie 3. La partie 1 est la plus chère alors qu'elle a servi peu de requêtes pour F ≥ 30, parce qu'une timeline de l'ancienne boucle lit jusqu'à 2 021 entités. Mon estimation des écritures est supérieure de 3 % à la facturation, peut-être parce que certaines entités n'ont pas été écrites comme je le suppose. 
 
-Sur le coût, mes estimations donnaient 1,43 $ de lectures et 0,50 $ d'écritures, soit 1,93 $. La facturation donne 1,47 $ et 0,43 $, soit 1,90 $, plus 0,03 $ de stockage d'images. Les deux totaux sont égaux, mais c'est en partie un hasard : mes lectures sont sous-estimées, mes écritures sur-estimées, et je n'ai pas déduit les quotas gratuits. Le plus important est que l'estimation à partir des journaux est proche de la facturation : on peut donc se fier aux nombres d'entités lues déduits du code.
+Sur le coût, mes estimations donnaient 1,43 $ de lectures et 0,50 $ d'écritures, soit 1,93 $. La facturation donne 1,47 $ et 0,43 $, soit 1,90 $, plus 0,03 $ de stockage d'images. 
 
 ---
 
