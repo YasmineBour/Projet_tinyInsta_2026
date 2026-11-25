@@ -42,7 +42,7 @@ Pour mesurer, j'ai utilisé des versions à instances fixes, sans autoscaling. C
 
 Table 1 – Les versions de l'application.
 
-Les versions `fixedN` et `fixchunk` sont de classe B1, parce que c'est ce que fixe le script `deploy_fixed.sh`. La version par défaut est de classe F1. Le fichier `main.py` du dépôt contient la correction de la partie 3, mais la version par défaut déployée contient toujours l'ancien code : `fixchunk` n'a pas été promue.
+Les versions `fixedN` et `fixchunk` sont de classe B1, parce que c'est ce que fixe le script `deploy_fixed.sh`.
 
 ### 1.2 Les jeux de données
 
@@ -55,7 +55,7 @@ Je mesure sur 26 jeux de données, soit environ 400 000 entités. Je les ai gén
 | F | `f05`, `f10`, …, `f100` (20 jeux) | 120 | 20 | 5, 10, …, 100 |
 
 Table 2 – Les jeux de données. Le point P = 20 est mesuré sur `u100`, qui a 100 utilisateurs et 20 posts.
-Je n'ai pas gardé la date exacte de génération de chaque jeu. D'après la date de création des posts, `base` a été généré le 28/10/2026 et `u10000` le 30/10/2026. Les autres jeux l'ont été entre ces deux dates ou le même jour, et en tout cas avant la campagne de la partie 1 du 30/10/2026.
+ `base` a été généré le 28/10/2026 et les autres jeux le 30/10/2026.
 
 ### 1.3 Comment je mesure
 
@@ -111,7 +111,7 @@ Figure 1b – Temps serveur médian et latence client médiane en fonction de F 
 
 Une timeline porte sur F + 1 auteurs : les F comptes suivis, plus l'utilisateur lui-même. Le code essaie d'abord la méthode IN. Si Datastore refuse la requête, l'erreur est attrapée par un `except` qui ne fait rien, et le code passe à la méthode boucle sans afficher aucun message.
 
-J'ai fait un test directement sur Datastore avec des `IN` de plus en plus grands. Avec 30 valeurs, ça marche. Avec 31 valeurs, Datastore répond « IN supports up to 30 values ». Donc, tant que F + 1 ≤ 30, c'est-à-dire jusqu'à F = 29, la méthode IN répond, avec une seule requête. À partir de F = 30, Datastore la refuse et le code passe à la méthode boucle : une requête par auteur, envoyées l'une après l'autre. La version GQL du code, elle, ne s'exécute jamais, car `client.gql` n'existe pas dans la bibliothèque installée.
+J'ai fait un test directement sur Datastore avec des `IN` de plus en plus grands. Avec 30 valeurs, ça marche. Avec 31 valeurs, Datastore répond « IN supports up to 30 values ». Donc, tant que F + 1 ≤ 30, c'est-à-dire jusqu'à F = 29, la méthode IN répond, avec une seule requête. À partir de F = 30, Datastore la refuse et le code passe à la méthode boucle : une requête par auteur, envoyées l'une après l'autre.
 
 Chaque requête de la boucle est un aller-retour vers Datastore : l'application pose la question, attend la réponse, puis pose la question suivante. Les temps s'additionnent. À F = 30, il y a 31 requêtes, soit 421 ms ; à F = 100, il y en a 101, soit 1 319 ms. Cela fait environ 13 ms par auteur, ce qui explique la pente après la marche.
 
@@ -136,7 +136,7 @@ Sur la figure 1b, la latence client est toujours un peu plus grande que le temps
 
 Table 3 – L'écart entre la latence client et le temps serveur.
 
-Quand la requête est rapide, presque la moitié de la latence ne vient pas du serveur. Quand elle est lente, ce n'est presque rien. Ces 23 ms ne sont pas seulement du réseau : ils contiennent aussi la préparation du JSON et le passage par le serveur web d'App Engine. La vraie part du réseau est donc au plus de 23 ms, et je ne l'ai pas séparée du reste.
+Quand la requête est rapide, presque la moitié de la latence ne vient pas du serveur. Quand elle est lente, ce n'est presque rien. Ces 23 ms ne sont pas seulement du réseau : ils contiennent aussi surement la préparation du JSON et le passage par le serveur web d'App Engine. La vraie part du réseau est donc au plus de 23 ms, et je ne l'ai pas séparée du reste.
 
 #### Combien d'entités Datastore une timeline lit-elle, et combien ça coûte ?
 
@@ -176,7 +176,7 @@ Dans `app.yaml`, l'application est lancée avec `entrypoint: gunicorn -b :$PORT 
 
 J'utilise deux outils. Le premier est la loi de Little : la latence moyenne vaut environ C ÷ débit, où C est le nombre d'utilisateurs Locust simultanés. Le deuxième est le débit maximal d'une instance qui traite une requête à la fois : 1 ÷ (le temps pendant lequel elle est occupée par une requête).
 
-Dans la partie 1, avec C = 1 sur `base`, la latence médiane est d'environ 48 ms, soit environ 20 requêtes par seconde. Mais la latence est le temps total vu par le client, et l'instance n'est pas occupée pendant tout ce temps : une partie sert au voyage de la réponse. J'estime que l'instance est occupée la moitié de la latence, soit environ 24 ms, qui est le temps serveur de la partie 1. Son débit maximal serait alors de 1 ÷ 0,024 s, soit environ 40 requêtes par seconde. C'est une estimation, et même un maximum : l'instance fait aussi d'autres choses que le temps serveur ne compte pas (Flask, fabrication du JSON).
+Dans la partie 1, avec C = 1 sur `base`, la latence médiane est d'environ 48 ms, soit environ 20 requêtes par seconde. Mais la latence est le temps total vu par le client, et l'instance n'est pas occupée pendant tout ce temps : une partie sert au voyage de la réponse. J'estime que l'instance est occupée la moitié de la latence, soit environ 24 ms, qui est le temps serveur de la partie 1. Son débit maximal serait alors de 1 ÷ 0,024 s, soit environ 40 requêtes par seconde. C'est une estimation, et même un maximum : l'instance fait aussi surement d'autres choses que le temps serveur ne compte pas.
 
 La saturation arrive quand C est égal au débit maximal multiplié par la latence sans charge : 40 × 0,048 s ≈ 2 pour une instance, donc environ 2N pour N instances.
 
@@ -206,15 +206,15 @@ Figure 2a – Débit en fonction de C, une courbe par valeur de N (jeu `base`). 
 
 Figure 2b – Latence médiane en fonction de C, pour N = 1, 2 et 4, avec la latence moyenne mesurée et la prédiction de la loi de Little (C ÷ débit). Échelle logarithmique. Valeurs : `figures/fig2b.csv`. Le résumé de tous les runs est dans `figures/resume_p2.csv`.
 
-**La saturation.** Je la définis comme le premier C qui atteint 90 % du débit maximal de ce N. Pour N = 1, le débit est de 28,1 requêtes par seconde à C = 2, pour un maximum de 28,9 : la saturation arrive à C = 2, comme je l'avais prédit. Pour N = 2, il est de 49,6 à C = 4, pour un maximum de 53,7 : C = 4, là aussi comme prévu. Pour N = 4, la courbe monte plus lentement : 70 requêtes par seconde à C = 4, 83 à C = 8, 93 à C = 16, 106 à C = 32 et 108 à C = 64. La saturation arrive donc vers C = 32, et non à C = 8. Une explication possible est que les requêtes ne sont pas parfaitement réparties entre les 4 instances : à C = 64, la plus chargée sert 28,3 % des requêtes au lieu de 25 %. Je ne l'ai pas vérifié.
+**La saturation.** Je la définis comme le premier C qui atteint 90 % du débit maximal de ce N. Pour N = 1, le débit est de 28,1 requêtes par seconde à C = 2, pour un maximum de 28,9 : la saturation arrive à C = 2, comme je l'avais prédit. Pour N = 2, il est de 49,6 à C = 4, pour un maximum de 53,7 : C = 4, là aussi comme prévu. Pour N = 4, la courbe monte plus lentement : 70 requêtes par seconde à C = 4, 83 à C = 8, 93 à C = 16, 106 à C = 32 et 108 à C = 64. La saturation arrive donc vers C = 32, et non à C = 8. 
 
-**La capacité d'une instance.** Le débit maximal est de 28,9, 53,7 et 108,3 requêtes par seconde. Divisé par N, cela donne 28,9, 26,9 et 27,1 requêtes par seconde par instance : environ 28, à peu près le même pour tous les N. C'est environ 30 % de moins que mes 40 prédites. Une instance est occupée environ 36 ms par requête (1 ÷ 28), alors que le temps passé dans `get_timeline` est de 21 à 26 ms, soit 60 à 70 % de ce temps. Je m'étais donc trompée en prenant 24 ms comme temps d'occupation : il reste environ 14 ms, déduites de mes chiffres et non mesurées, pour tout ce que l'instance fait en dehors de `get_timeline` (Flask, JSON).
+**La capacité d'une instance.** Le débit maximal est de 28,9, 53,7 et 108,3 requêtes par seconde. Divisé par N, cela donne 28,9, 26,9 et 27,1 requêtes par seconde par instance : environ 28, à peu près le même pour tous les N. C'est environ 30 % de moins que mes 40 prédites. Une instance est occupée environ 36 ms par requête (1 ÷ 28), alors que le temps passé dans `get_timeline` est de 21 à 26 ms, soit 60 à 70 % de ce temps. Je m'étais donc trompée en prenant 24 ms comme temps d'occupation : il reste environ 14 ms, déduites de mes chiffres et non mesurées, pour tout ce que l'instance fait en dehors de `get_timeline`.
 
 **Ce qui limite une instance.** C'est son worker `gunicorn` : il n'y en a qu'un par instance, et il traite une seule requête à la fois. Pendant que `get_timeline` attend la réponse de Datastore, il ne peut pas traiter une autre requête. Deux observations confirment que les requêtes attendent avant d'entrer dans `get_timeline`, derrière ce worker. Pour N = 1, le temps serveur reste entre 21 et 23 ms quand C passe de 1 à 64, alors que la latence passe de 45 ms à 2 195 ms. Et la capacité par instance est la même quel que soit N : comme un guichet qui sert un client à la fois, ajouter des instances ajoute des guichets.
 
 **La loi de Little reste vraie après la saturation, sur la latence moyenne.** Dans les runs avec 0 à 2 requêtes en échec, l'écart entre C ÷ débit et la latence moyenne est d'au plus 0,6 %, y compris bien après la saturation : 0,3 % pour N = 1 à C = 4, 0,5 % pour N = 2 à C = 8. Elle ne colle pas à la latence médiane quand C est grand : pour N = 2 et C = 64, la médiane est de 714 ms et la moyenne de 1 167 ms. Quelques requêtes très longues tirent la moyenne vers le haut, et la loi de Little parle de la moyenne.
 
-L'écart avec la moyenne grandit dans les runs qui contiennent des requêtes en échec : 14,6 % pour N = 1 à C = 16 (8 échecs), 16,6 % pour N = 2 à C = 16 (9 échecs), 13,5 % pour N = 4 à C = 16 (8 échecs), contre 1 à 5 % pour les runs à C = 64 avec 3 ou 4 échecs. Ces échecs sont des erreurs de résolution de nom (`gaierror` dans la colonne `ERROR`) : le client n'a pas trouvé l'adresse de l'application, donc la requête n'a probablement jamais atteint le serveur. À C = 16, chaque requête en échec a duré 10, 15 ou 20 secondes, des multiples de 5 secondes. Pendant ce temps, l'utilisateur Locust n'a reçu aucune réponse : ce temps est perdu, mais il n'est compté ni dans le débit ni dans la latence moyenne, qui ne gardent que les réponses 200. Donc C ÷ débit devient trop grand. Ce n'est pas la saturation qui crée l'écart, car les runs saturés sans échec n'en ont presque pas.
+L'écart avec la moyenne grandit dans les runs qui contiennent des requêtes en échec : 14,6 % pour N = 1 à C = 16 (8 échecs), 16,6 % pour N = 2 à C = 16 (9 échecs), 13,5 % pour N = 4 à C = 16 (8 échecs), contre 1 à 5 % pour les runs à C = 64 avec 3 ou 4 échecs. Ces échecs sont des erreurs de résolution de nom (`gaierror` dans la colonne `ERROR`) : le client n'a pas trouvé l'adresse de l'application, donc la requête n'a probablement jamais atteint le serveur. À C = 16, chaque requête en échec a duré 10, 15 ou 20 secondes. Pendant ce temps, l'utilisateur Locust n'a reçu aucune réponse : ce temps est perdu, mais il n'est compté ni dans le débit ni dans la latence moyenne, qui ne gardent que les réponses 200. Donc C ÷ débit devient trop grand. Ce n'est pas la saturation qui crée l'écart, car les runs saturés sans échec n'en ont presque pas.
 
 **Passer de 1 à 4 instances multiplie presque le débit par 4.**
 
@@ -226,9 +226,9 @@ L'écart avec la moyenne grandit dans les runs qui contiennent des requêtes en 
 
 Table 6 – La capacité selon N.
 
-Le débit est multiplié par 1,9 avec 2 instances et par 3,8 avec 4, soit environ 94 à 95 % de la proportionnalité parfaite. Je ne peux pas affirmer qu'il existe un goulot qui bloque le passage à plusieurs instances, car l'écart de 5 à 6 % est du même ordre que le bruit entre runs : pour N = 1 seul, le débit à saturation va de 23,7 à 28,9 requêtes par seconde selon C. Quelques pistes, que je n'ai pas testées : la répartition un peu inégale des requêtes à forte charge, le Datastore partagé (le temps serveur est de 24 à 26 ms pour N = 2 et N = 4, contre 21 à 23 ms pour N = 1), et le fait que N = 4 monte encore entre C = 32 et C = 64, donc que son maximum est peut-être sous-estimé. Le goulot n'est pas dans le code de `get_timeline` : avec F = 20, c'est toujours la méthode IN, et son temps ne monte pas avec C.
+Le débit est multiplié par 1,9 avec 2 instances et par 3,8 avec 4, soit environ 94 à 95 % de la proportionnalité parfaite. Je ne peux pas affirmer qu'il existe un goulot qui bloque le passage à plusieurs instances : pour N = 1 seul, le débit à saturation va de 23,7 à 28,9 requêtes par seconde selon C. Quelques pistes, que je n'ai pas testées : la répartition un peu inégale des requêtes à forte charge, le Datastore partagé (le temps serveur est de 24 à 26 ms pour N = 2 et N = 4, contre 21 à 23 ms pour N = 1), et le fait que N = 4 monte encore entre C = 32 et C = 64, donc que son maximum est peut-être sous-estimé. Le goulot n'est pas dans le code de `get_timeline` : avec F = 20, c'est toujours la méthode IN, et son temps ne monte pas avec C.
 
-À C = 2, N = 2 et N = 4 ont presque le même débit (37,9 et 37,7 requêtes par seconde). Ce n'est pas un défaut : avec 2 requêtes en même temps, 2 instances suffisent.
+À C = 2, N = 2 et N = 4 ont presque le même débit (37,9 et 37,7 requêtes par seconde).
 
 #### Mon hypothèse face aux mesures
 
@@ -271,7 +271,7 @@ Le nombre de requêtes passe de F + 1 à (F + 1) ÷ 30 arrondi vers le haut : 4 
 
 Cette correction a un coût :
 
-- **Complexité** : quelques lignes en plus, un code un peu plus long à lire.
+- **Complexité** : quelques lignes en plus.
 - **Elle ne supprime pas le problème** : les requêtes restent envoyées l'une après l'autre, donc le temps continue d'augmenter avec F, par paliers.
 - **Cohérence des données** : je ne change aucune donnée. Mais on fait plusieurs requêtes à des instants légèrement différents, donc un post écrit entre deux requêtes peut apparaître ou non. La boucle d'origine avait déjà ce défaut.
 - **Erreurs** : je supprime le `try / except` silencieux. Si Datastore refuse une requête, on le verra, au lieu d'avoir un ralentissement caché.
@@ -306,7 +306,7 @@ La correction apporte un gain net pour F ≥ 30 : le temps serveur est divisé p
 
 **Mon hypothèse face aux mesures.** Les prédictions sont confirmées : à F = 30, 46 ms, bien plus proche de 27 que de 420 ; 46, 71 et 91 ms à F = 30, 60 et 100, tous sous les bornes de 54, 81 et 108 ms ; et une courbe en escalier. Il y a trois points que j'avais mal estimés :
 
-- **Pour F ≤ 25, la version corrigée est un peu plus lente**, de 2 à 5 ms sur le temps serveur (26,6 ms au lieu de 24,5 ms à F = 5). Je ne pense pas que le code en soit la cause : pour F ≤ 25, il n'y a qu'un groupe, donc le code fait presque la même chose qu'avant. De plus, la partie de la latence qui n'est pas dans `get_timeline` (l'écart entre la latence client et le temps serveur) passe de 23 ms à environ 28 ms, alors que le code ne la touche pas. Les mesures d'avant et d'après n'ont pas été faites le même jour : je pense à une différence entre sessions, mais je ne l'ai pas démontré.
+- **Pour F ≤ 25, la version corrigée est un peu plus lente**, de 2 à 5 ms sur le temps serveur (26,6 ms au lieu de 24,5 ms à F = 5). Je ne pense pas que le code en soit la cause : pour F ≤ 25, il n'y a qu'un groupe, donc le code fait presque la même chose qu'avant. De plus, la partie de la latence qui n'est pas dans `get_timeline` (l'écart entre la latence client et le temps serveur) passe de 23 ms à environ 28 ms, alors que le code ne la touche pas. Les mesures d'avant et d'après n'ont pas été faites le même jour.
 - **Chaque groupe ajouté coûte environ 15 à 21 ms**, et non 27 ms. Mes 27 ms comprenaient aussi la lecture de l'utilisateur, faite une seule fois.
 - **Le temps monte un peu à l'intérieur d'une marche** (46 ms à F = 30, 53 ms à F = 45). Le nombre de requêtes n'explique donc pas tout : une requête avec plus d'auteurs prend un peu plus de temps.
 
